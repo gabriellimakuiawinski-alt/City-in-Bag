@@ -230,9 +230,9 @@ function smallHouse(piece){
 const resLow = [
   { nome:'Casa térrea', lux:0, sizes:[[1,1],[1,2]], f:smallHouse('casaTerrea') },
   { nome:'Sobrado', lux:1, sizes:[[1,1],[1,2]], f:smallHouse('sobrado') },
-  { nome:'Chalé', lux:1, sizes:[[1,1],[1,2]], f:smallHouse('chale') },
+  { nome:'Chalé', lux:0, sizes:[[1,1],[1,2]], f:smallHouse('chale') },
   { nome:'Casa com garagem', lux:1, sizes:[[1,1],[1,2]], f:smallHouse('garagem') },
-  { nome:'Casa com varanda', lux:1, sizes:[[1,1],[2,1],[2,2]], f(k,R,fw,fd){
+  { nome:'Casa com varanda', lux:0, sizes:[[1,1],[2,1],[2,2]], f(k,R,fw,fd){
     ground(k, fw, fd);
     const W = fw*0.66, D = 0.42, H = 0.3, cz = fd/2-0.62, wall = pick(R,WALLS), roof = pick(R,ROOFS);
     k.add(box(W,H,D), wall, 0,H/2+0.03,cz);
@@ -423,6 +423,20 @@ const resHigh = [
     addTree(k, 0, cz-0.3, R, 1.0); addTree(k, -0.5, -fd/2+0.4, R, 0.7); addTree(k, 0.5, -fd/2+0.4, R, 0.7);
     k.floors = fl;
   }},
+  { nome:'Residencial de luxo', lux:2, sizes:[[2,2],[3,2],[3,3]], f(k,R,fw,fd){
+    ground(k, fw, fd, '#a6d07a');
+    const W = fw-0.3, D = fd-0.4, pod = 0.5, cz = -0.05;
+    k.add(box(W,pod,D), '#e9e2d6', 0,pod/2,cz);
+    k.add(box(W*0.8,pod*0.5,0.02), GLASS, 0,pod*0.35,cz+D/2+0.006, { edges:false });
+    flatRoof(k, W, D, pod, 0, cz, '#f2efe8', '#cfe3c0');
+    pool(k, W*0.2, cz+D*0.2, W*0.3, D*0.22);
+    const tw = Math.min(W,D)*0.5, fl = rint(R,10,14), fh = 0.22, H = fl*fh, g = pick(R,['#8fc3cf','#a3d3e6','#7fb6d1']);
+    k.add(box(tw,H,tw), g, -W*0.18,pod+H/2,cz-D*0.12);
+    for (let f=0; f<=fl; f+=2) k.add(box(tw+0.06,0.03,tw+0.06), '#f7f7f4', -W*0.18,pod+f*fh,cz-D*0.12);
+    flatRoof(k, tw, tw, pod+H, -W*0.18, cz-D*0.12, '#f7f7f4', '#cfd3d6');
+    addTree(k, fw/2-0.2, fd/2-0.2, R, 0.7); addTree(k, -fw/2+0.2, fd/2-0.2, R, 0.7);
+    k.floors = fl;
+  }},
 ];
 
 // ============================================================
@@ -461,8 +475,7 @@ const comLow = [
 // ============================================================
 //  COMERCIAL ALTA DENSIDADE
 // ============================================================
-const comHigh = [
-  { nome:'Torre de escritórios', lux:2, sizes:[[1,1],[2,1],[2,2]], f(k,R,fw,fd){
+const officeTower = { nome:'Torre de escritórios', lux:2, sizes:[[1,1],[2,1],[2,2]], f(k,R,fw,fd){
     ground(k, fw, fd, '#d6d3cc');
     const fl = rint(R,7,15), fh = 0.22, W = fw-0.28, D = fd-0.28, H = fl*fh, g = pick(R,['#7fb6d1','#6fa3c4','#8fc3cf','#7aa6b8']);
     k.add(box(W,H,D), g, 0,H/2,-0.04);
@@ -473,7 +486,8 @@ const comHigh = [
     k.add(box(0.24,0.03,0.16), '#3b3f44', 0,0.2,D/2+0.04);
     door(k, 0, 0, D/2-0.04+0.004, '#3b3f44', 0.18, 0.16);
     k.floors = fl;
-  }},
+  }};
+const comHigh = [
   { nome:'Banco', lux:2, sizes:[[1,1],[2,1],[2,2]], f(k,R,fw,fd){
     ground(k, fw, fd, '#e0d6c0');
     const W = fw-0.16, D = fd-0.34, H = 0.62, c = '#efe6d2', cz = -0.08;
@@ -643,7 +657,84 @@ const indHigh = [
   }},
 ];
 
-export const ZONE_MODELS = { res:[resLow, resHigh], com:[comLow, comHigh], ind:[indLow, indHigh] };
+
+// ============================================================
+//  ESCRITÓRIOS
+// ============================================================
+const offLow = [
+  { nome:'Escritório de bairro', lux:1, sizes:[[1,1],[2,1]], f(k,R,fw,fd){
+    ground(k, fw, fd, '#d6d3cc');
+    const fl = rint(R,2,3), fh = 0.26, W = fw-0.22, D = 0.62, H = fl*fh, cz = -0.06, c = pick(R,['#eef0f2','#e9e2d6','#dfe5e8']);
+    k.add(box(W,H,D), c, 0,H/2,cz);
+    for (let f=0; f<fl; f++) k.add(box(W+0.005,fh*0.45,D+0.005), pick(R,[GLASS,'#9cc7d9']), 0,f*fh+fh*0.55,cz, { edges:false });
+    flatRoof(k, W, D, H, 0, cz);
+    door(k, 0, 0, cz+D/2+0.004, '#3b3f44', 0.16, 0.2);
+    k.add(box(0.3,0.06,0.03), '#7a59c4', 0,H+0.08,cz+D/2-0.05);
+    bush(k,-fw/2+0.12,fd/2-0.1,R); bush(k,fw/2-0.12,fd/2-0.1,R);
+    k.floors = fl;
+  }},
+  { nome:'Clínica', lux:1, sizes:[[1,1],[2,1],[2,2]], f(k,R,fw,fd){
+    ground(k, fw, fd, '#d8e3d0');
+    const W = fw-0.2, D = Math.min(fd,1.4)*0.6, H = 0.5, cz = fd/2-0.2-D/2;
+    k.add(box(W,H,D), '#f7f7f4', 0,H/2,cz);
+    windows(k, { W, D, cz, floors:2, fh:0.25, ww:0.1, wh:0.1, color:'#a7dbe0' });
+    flatRoof(k, W, D, H, 0, cz);
+    k.add(box(0.05,0.16,0.03), '#3aa36b', 0,H+0.12,cz+D/2-0.04); k.add(box(0.16,0.05,0.03), '#3aa36b', 0,H+0.12,cz+D/2-0.04);
+    door(k, 0, 0, cz+D/2+0.004, '#3b3f44', 0.18, 0.2);
+    if (fd > 1) parking(k, 0, -fd/2+0.35, W, 0.5, R);
+    k.floors = 2;
+  }},
+  { nome:'Coworking', lux:1, sizes:[[1,2],[2,2]], f(k,R,fw,fd){
+    ground(k, fw, fd, '#cfc9bb');
+    const W = fw-0.2, D = fd-0.4, H = 0.62, cz = -0.05, c = pick(R,BRICK);
+    k.add(box(W,H,D), c, 0,H/2,cz);
+    windows(k, { W, D, cz, floors:2, fh:0.31, ww:0.16, wh:0.18, frame:'#3b3f44', gap:0.26 });
+    k.add(shed(W+0.04,D+0.04,0.12), '#3b3f44', 0,H,cz);
+    door(k, 0, 0, cz+D/2+0.004, '#3b3f44', 0.2, 0.22);
+    for (let i=0;i<2;i++) k.add(box(0.12,0.05,0.04), '#e98b2a', -0.2+i*0.4,0.04,fd/2-0.12);
+    k.floors = 2;
+  }},
+];
+const offHigh = [
+  officeTower,
+  { nome:'Torre espelhada', lux:2, sizes:[[1,1],[2,2]], f(k,R,fw,fd){
+    ground(k, fw, fd, '#d6d3cc');
+    const fl = rint(R,10,16), fh = 0.22, s = Math.min(fw,fd), g = pick(R,['#6fa3c4','#7ec0d6','#5f8fb8']);
+    let y = 0;
+    for (let i=0;i<3;i++){ const w = s*(0.72-i*0.12), n = Math.round(fl/3), h = n*fh; k.add(box(w,h,w), g, 0,y+h/2,-0.04); for (let f=0;f<n;f+=2) k.add(box(w+0.01,0.02,w+0.01), '#dfeef5', 0,y+f*fh,-0.04, { edges:false }); y += h; }
+    k.add(cyl(0.01,0.01,0.6,4), '#5c5048', 0,y+0.3,-0.04);
+    k.floors = fl;
+  }},
+  { nome:'Sede corporativa', lux:2, sizes:[[2,2],[3,2]], f(k,R,fw,fd){
+    ground(k, fw, fd, '#d8d2c4');
+    const W = fw-0.3, D = fd-0.5, cz = -0.05, fl = rint(R,5,7), fh = 0.24, H = fl*fh;
+    k.add(box(W,H,D), '#f2efe8', 0,H/2,cz);
+    k.add(box(W*0.5,H+0.02,D+0.02), '#7fb6d1', 0,H/2,cz);
+    windows(k, { W, D, cz, floors:fl, fh, ww:0.1, wh:0.12, faces:'lr' });
+    flatRoof(k, W, D, H, 0, cz);
+    k.add(box(0.8,0.12,0.04), '#7a59c4', 0,H+0.12,cz+D/2-0.05);
+    k.add(box(W*0.6,0.03,0.25), '#e3d3ad', 0,0.02,fd/2-0.15, { edges:false });
+    k.floors = fl;
+  }},
+  { nome:'Centro empresarial', lux:2, sizes:[[3,3],[4,3],[3,4],[4,4]], f(k,R,fw,fd){
+    ground(k, fw, fd, '#d6d3cc');
+    const pod = 0.4, W = fw-0.3, D = fd-0.4;
+    k.add(box(W,pod,D*0.55), '#e9e6df', 0,pod/2,-fd/2+0.2+D*0.275);
+    flatRoof(k, W, D*0.55, pod, 0, -fd/2+0.2+D*0.275);
+    for (const sx of [-1,1]){
+      const fl = rint(R,10,15), fh = 0.22, H = fl*fh, w = 0.8, x = sx*(W/2-0.55), z = -fd/2+0.2+D*0.275;
+      k.add(box(w,H,w), pick(R,['#7fb6d1','#8fc3cf']), x,pod+H/2,z);
+      for (let f=0; f<=fl; f++) k.add(box(w+0.02,0.025,w+0.02), '#eef2f3', x,pod+f*fh,z, { edges:false });
+      flatRoof(k, w, w, pod+H, x, z);
+    }
+    k.add(box(W,0.03,fd*0.4), '#e3d3ad', 0,0.02,fd/2-fd*0.22, { edges:false });
+    k.add(cyl(0.25,0.27,0.08,16), '#cfc8b8', 0,0.05,fd/2-fd*0.22); k.add(cyl(0.21,0.21,0.02,16), WATER, 0,0.1,fd/2-fd*0.22, { edges:false });
+    for (const sx of [-1,1]) addTree(k, sx*W*0.35, fd/2-0.35, R, 0.8);
+    k.floors = 15;
+  }},
+];
+
+export const ZONE_MODELS = { res:[resLow, resHigh], com:[comLow, comHigh], ind:[indLow, indHigh], off:[offLow, offHigh] };
 
 // ============================================================
 //  ESPECIAIS
@@ -704,6 +795,66 @@ export const SPECIAL_MODELS = {
     k.add(cyl(0.06,0.06,0.2,12), '#e0a35a', -0.2,0.4,0.35, { rz:Math.PI/2 });
     for (let i=0;i<3;i++) k.add(box(0.16,0.13,0.16), '#c49a5a', -0.75+i*0.2, 0.065, 0.62, { ry:R()*0.5 });
     k.addSmoke(0.66,1.18,-0.58);
+  },
+};
+
+
+// ============================================================
+//  MARCOS
+// ============================================================
+export const LANDMARKS = {
+  torretv(k,R){
+    ground(k, 2, 2, '#9fcb6c');
+    k.add(cyl(0.55,0.6,0.08,16), '#cfc8b8', 0,0.04,0);
+    for (let i=0;i<3;i++){ const a = i*Math.PI*2/3; k.add(box(0.06,0.9,0.06), '#d9d4c8', Math.cos(a)*0.18,0.45,Math.sin(a)*0.18, { ry:-a, rz:0.14*(i?1:1) }); }
+    k.add(cyl(0.07,0.12,3.2,12), '#f2efe8', 0,1.6,0);
+    for (let i=1;i<6;i++) k.add(cyl(0.085,0.085,0.05,12), '#d9443a', 0,i*0.5,0);
+    k.add(cyl(0.34,0.24,0.22,16), '#5f8fb8', 0,2.75,0);
+    k.add(cyl(0.36,0.36,0.04,16), '#f2efe8', 0,2.88,0);
+    k.add(cyl(0.26,0.3,0.14,16), '#f2efe8', 0,2.55,0);
+    k.add(cyl(0.015,0.025,0.9,8), '#d9443a', 0,3.65,0);
+    addTree(k,-0.7,0.7,R,0.7); addTree(k,0.7,-0.7,R,0.7);
+  },
+  catedral(k,R){
+    ground(k, 3, 3, '#e3d8c2');
+    const c = '#e9dcc4', roof = '#5f6f7a', cz = -0.2;
+    k.add(box(0.9,0.9,1.7), c, 0,0.45,cz);
+    k.add(gable(1.0,1.8,0.5), roof, 0,0.9,cz);
+    for (const sx of [-1,1]){ k.add(box(0.38,0.55,1.4), c, sx*0.62,0.275,cz-0.1); k.add(shed(0.42,1.44,0.22), roof, sx*0.62,0.55,cz-0.1, { ry: sx<0 ? 0 : Math.PI }); }
+    for (const sx of [-1,1]){ const x = sx*0.42, z = cz+0.85; k.add(box(0.4,1.5,0.4), c, x,0.75,z); k.add(cone(0.3,0.9,4), roof, x,1.95,z, { ry:Math.PI/4 }); k.add(box(0.12,0.2,0.02), GLASS, x,1.2,z+0.206, { edges:false }); }
+    k.add(cyl(0.18,0.18,0.03,20), '#c9a0dc', 0,0.85,cz+0.86, { rx:Math.PI/2 });
+    k.add(cyl(0.12,0.12,0.035,20), '#f2c14e', 0,0.85,cz+0.865, { rx:Math.PI/2, edges:false });
+    k.add(box(0.26,0.45,0.03), '#5b3a2c', 0,0.225,cz+0.86);
+    for (let i=0;i<4;i++){ k.add(box(0.02,0.3,0.12), '#c9a0dc', 0.452,0.45,cz-0.6+i*0.35, { edges:false }); k.add(box(0.02,0.3,0.12), '#c9a0dc', -0.452,0.45,cz-0.6+i*0.35, { edges:false }); }
+    k.add(box(1.4,0.03,0.6), '#d8cfbc', 0,0.02,1.15, { edges:false });
+    addTree(k,-1.2,1.2,R,0.8); addTree(k,1.2,1.2,R,0.8); addTree(k,-1.2,-1.2,R,0.8); addTree(k,1.2,-1.2,R,0.8);
+  },
+  estadio(k,R){
+    ground(k, 4, 4, '#b9b3a6');
+    const n = 28, rx = 1.65, rz = 1.45;
+    for (let i=0;i<n;i++){
+      const a = i*Math.PI*2/n, x = Math.cos(a)*rx, z = Math.sin(a)*rz;
+      k.add(box(0.42,0.55,0.34), i%2 ? '#e9e6df' : '#dcd7cf', x,0.275,z, { ry:-a+Math.PI/2 });
+      k.add(box(0.44,0.04,0.36), i%4<2 ? '#d9443a' : '#3f7fc4', x,0.57,z, { ry:-a+Math.PI/2 });
+    }
+    k.add(cyl(1.0,1.0,0.03,28), '#5aa63f', 0,0.03,0, { s:1 });
+    k.add(box(1.5,0.032,0.9), '#62b046', 0,0.035,0, { edges:false });
+    k.add(box(1.5,0.034,0.015), '#ffffff', 0,0.04,0, { edges:false });
+    k.add(cyl(0.16,0.16,0.035,20), '#ffffff', 0,0.038,0, { edges:false }); k.add(cyl(0.15,0.15,0.036,20), '#62b046', 0,0.04,0, { edges:false });
+    for (const [x,z] of [[-1.7,-1.6],[1.7,-1.6],[-1.7,1.6],[1.7,1.6]]){ k.add(cyl(0.025,0.03,1.4,8), '#8c939a', x,0.7,z); k.add(box(0.3,0.16,0.06), '#f2f0ea', x,1.42,z, { ry:Math.atan2(x,z) }); }
+  },
+  parquecentral(k,R){
+    ground(k, 4, 4, '#7ab850');
+    k.add(cyl(0.9,0.9,0.03,24), '#e6d39b', 0.4,0.02,-0.4, { edges:false });
+    k.add(cyl(0.8,0.8,0.04,24), WATER, 0.4,0.03,-0.4, { edges:false });
+    k.add(box(4,0.034,0.22), '#e3d3ad', 0,0.017,1.0, { edges:false });
+    k.add(box(0.22,0.034,4), '#e3d3ad', -1.0,0.017,0, { edges:false });
+    k.add(cyl(0.3,0.3,0.05,8), '#f2efe8', -1.0,0.05,1.0);
+    for (let i=0;i<6;i++) k.add(box(0.03,0.32,0.03), '#f2efe8', -1.0+Math.cos(i)*0.26,0.2,1.0+Math.sin(i)*0.26);
+    k.add(cone(0.36,0.22,8), '#c4552f', -1.0,0.47,1.0);
+    const R2 = R; for (let i=0;i<18;i++){ const x = -1.8+R2()*3.6, z = -1.8+R2()*3.6; if (Math.hypot(x-0.4,z+0.4)<1.0 || Math.abs(z-1.0)<0.25 || Math.abs(x+1.0)<0.25) continue; addTree(k, x, z, R2, 0.9+R2()*0.4); }
+    for (let i=0;i<3;i++) k.add(box(0.2,0.04,0.06), '#8a5a3b', 0.2+i*0.5,0.06,1.22);
+    k.add(box(0.2,0.05,0.08), '#f2efe8', 0.4,0.06,0.45); 
   },
 };
 

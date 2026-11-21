@@ -1,17 +1,30 @@
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { Kit, box, addTree, ZONE_MODELS, SPECIAL_MODELS, prefeitura as prefModel, farmTile, farmFence, barn, sprinkler, tractorKit } from './models.js';
+import { Kit, box, addTree, ZONE_MODELS, SPECIAL_MODELS, LANDMARKS, prefeitura as prefModel, farmTile, farmFence, barn, sprinkler, tractorKit } from './models.js';
 
 // ================== CONFIG ==================
 const N = 48;
 const DAY = 1.5;
-const SAVE_KEY = 'cidade_proto_v3';
+const SAVE_KEY = 'cidade_proto_v4';
 const T = { EMPTY:0, ROAD:1, WATER:2, TREE:3, BUILD:4, BRIDGE:5, FARM:6 };
-const Z = { NONE:0, RES:1, COM:2, IND:3 };
-const ZKEY = [null,'res','com','ind'];
-const ZNAME = [null,'Residencial','Comercial','Industrial'];
-const ZCOL = [null, ['#5fbf4a','#2f8f3a'], ['#4f8fe0','#2f5fb8'], ['#e6b43a','#c4801e']];
+const Z = { NONE:0, RES:1, COM:2, IND:3, OFF:4 };
+const ZKEY = [null,'res','com','ind','off'];
+const ZNAME = [null,'Residencial','Comercial','Industrial','Escritórios'];
+const ZCOL = [null, ['#5fbf4a','#2f8f3a'], ['#4f8fe0','#2f5fb8'], ['#e6b43a','#c4801e'], ['#a07ae0','#7350c0']];
+const CLASSES = [
+  { nome:'Baixa', cor:'#8fd06a', tax:0.1, stage:0 },
+  { nome:'Média', cor:'#4fae3a', tax:0.2, stage:1 },
+  { nome:'Alta',  cor:'#2a7a2a', tax:0.4, stage:2 },
+];
+// quem pode trabalhar onde (índices de classe)
+const JOBCLS = { ind:[0], fazenda:[0], processadora:[0], com0:[0,1], com1:[2,1], off:[2,1], prefeitura:[1], marco:[0,1] };
+const MARCOS = {
+  torretv:       { nome:'Torre de TV',    ic:'tv',       custo:6000,  manut:20, w:2, visit:25, jobs:6 },
+  catedral:      { nome:'Catedral',       ic:'catedral', custo:8000,  manut:25, w:3, visit:35, jobs:6 },
+  parquecentral: { nome:'Parque central', ic:'parque',   custo:5000,  manut:18, w:4, visit:30, jobs:8 },
+  estadio:       { nome:'Estádio',        ic:'estadio',  custo:15000, manut:40, w:4, visit:60, jobs:14 },
+};
 
 const STAGES = [
   { nome:'Vila',           pop:0,     maxArea:4 },
@@ -27,20 +40,32 @@ const SPECIAL = {
   prefeitura:   { nome:'Prefeitura', ic:'pref', custo:1500, w:2, unique:true },
   parque:       { nome:'Praça', ic:'praca', custo:150, manut:1, w:1 },
   processadora: { nome:'Fábrica de alimentos', curto:'Alimentos', ic:'food', custo:500, manut:4, w:2, jobs:6 },
+  ...Object.fromEntries(Object.entries(MARCOS).map(([k,m])=>[k,{ ...m, unique:true, marco:true }])),
 };
+const isMarco = t => !!MARCOS[t];
 
 const TOOLS = [
-  { id:'ver',  ic:'hand', nome:'Ver' },
-  { id:'rua',  ic:'road', nome:'Rua', custo:10 },
-  { id:'zres', ic:'res',  nome:'Casas', zone:Z.RES, tag:'var(--r)', sep:true },
-  { id:'zcom', ic:'com',  nome:'Comércio', zone:Z.COM, tag:'var(--c)' },
-  { id:'zind', ic:'ind',  nome:'Indústria', zone:Z.IND, tag:'var(--i)' },
-  { id:'fazenda', ic:'farm', nome:'Fazenda', sub:'R$ 25/lote', sep:true },
-  { id:'processadora', ic:'food', nome:'Alimentos', custo:500 },
-  { id:'prefeitura', ic:'pref', nome:'Prefeitura', custo:1500 },
-  { id:'parque', ic:'praca', nome:'Praça', custo:150 },
-  { id:'arvore',  ic:'tree', nome:'Árvore', custo:10, sep:true },
-  { id:'demolir', ic:'demo', nome:'Demolir' },
+  { id:'ver',  ic:'hand', nome:'Ver', cat:'ver' },
+  { id:'rua',  ic:'road', nome:'Rua', custo:10, cat:'ruas' },
+  { id:'arvore',  ic:'tree', nome:'Árvore', custo:10, cat:'ruas' },
+  { id:'zres', ic:'res',  nome:'Casas', zone:Z.RES, tag:'var(--r)', cat:'bairros' },
+  { id:'zcom', ic:'com',  nome:'Comércio', zone:Z.COM, tag:'var(--c)', cat:'bairros' },
+  { id:'zind', ic:'ind',  nome:'Indústria', zone:Z.IND, tag:'var(--i)', cat:'bairros' },
+  { id:'zoff', ic:'off',  nome:'Escritórios', zone:Z.OFF, tag:'var(--o)', cat:'bairros', stage:1 },
+  { id:'fazenda', ic:'farm', nome:'Fazenda', sub:'R$ 25/lote', cat:'producao' },
+  { id:'processadora', ic:'food', nome:'Alimentos', custo:500, cat:'producao' },
+  { id:'prefeitura', ic:'pref', nome:'Prefeitura', custo:1500, cat:'cidade' },
+  { id:'parque', ic:'praca', nome:'Praça', custo:150, cat:'cidade' },
+  ...Object.entries(MARCOS).map(([id,m])=>({ id, ic:m.ic, nome:m.nome, custo:m.custo, cat:'marcos', stage:1 })),
+  { id:'demolir', ic:'demo', nome:'Demolir', cat:'ruas' },
+];
+const CATS = [
+  { id:'ver', ic:'hand', nome:'Ver', cor:'#fff6e3' },
+  { id:'ruas', ic:'road', nome:'Obras', cor:'#e4e1da' },
+  { id:'bairros', ic:'res', nome:'Bairros', cor:'#d9f0c8' },
+  { id:'producao', ic:'farm', nome:'Produção', cor:'#fbe6b0' },
+  { id:'cidade', ic:'pref', nome:'Cidade', cor:'#d8e6f6' },
+  { id:'marcos', ic:'star', nome:'Marcos', cor:'#ecdcf6' },
 ];
 const ROAD_COST = 10, BRIDGE_COST = 50, TREE_COST = 10;
 
@@ -55,7 +80,10 @@ const GOALS = [
   { txt:'Compre um trator para uma fazenda',            prog:()=>[[...farms.values()].some(f=>f.level>=2)?1:0,1] },
   { txt:'Chegue a 1.000 moradores',                     prog:()=>[Math.min(popTotal(),1000),1000] },
   { txt:'Faça crescer um prédio de alta densidade',     prog:()=>[[...blds.values()].some(b=>b.dens===1)?1:0,1] },
+  { txt:'Crie um bairro de escritórios',                prog:()=>[Math.min(countB('off'),2),2] },
+  { txt:'Construa seu primeiro marco',                  prog:()=>[Math.min([...blds.values()].filter(b=>isMarco(b.type)).length,1),1] },
   { txt:'Amplie a prefeitura',                          prog:()=>[[...blds.values()].some(b=>b.type==='prefeitura'&&b.s>=3)?1:0,1] },
+  { txt:'Tenha 100 moradores de classe alta',           prog:()=>[Math.min(popByClass()[2],100),100] },
 ];
 
 // ================== UTIL ==================
@@ -65,6 +93,7 @@ const inb = (x,z) => x>=0 && z>=0 && x<N && z<N;
 const fmt = n => Math.round(n).toLocaleString('pt-BR');
 const $ = s => document.querySelector(s);
 const ico = (id, cls='ico') => `<svg class="${cls}"><use href="#i-${id}"/></svg>`;
+const ib = id => `<span class="ib">${ico(id)}</span>`;
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const wx = x => x - N/2 + 0.5;
 const DIRS = [[0,0,1],[Math.PI/2,1,0],[-Math.PI/2,-1,0],[Math.PI,0,-1]];
@@ -114,7 +143,7 @@ const grid = { t:new Uint8Array(N*N), b:new Int32Array(N*N).fill(-1), z:new Uint
 const lv = new Float32Array(N*N), poll = new Uint8Array(N*N), park = new Uint8Array(N*N), nearWater = new Uint8Array(N*N);
 const blds = new Map(), farms = new Map();
 let nextId = 1, S;
-const fresh = () => ({ money:10000, day:1, trigo:0, alim:30, merc:20, happy:70, speed:1, goal:0, inc:0, stage:0, alerts:[], dem:[0.6,0.2,0.3] });
+const fresh = () => ({ money:10000, day:1, trigo:0, alim:30, merc:20, happy:70, speed:1, goal:0, inc:0, stage:0, alerts:[], dem:[0.6,0.2,0.3,-1], demR:[0.6,-1,-1], visit:0 });
 
 // ================== MUNDO ==================
 const world = new THREE.Group(); scene.add(world);
@@ -242,8 +271,10 @@ function bStat(b){
     const a = b.fw*b.fd, f = b.floors||1, cm = b.capMul||1;
     if (b.type==='res') return { cap: Math.max(2, Math.round(b.dens ? a*f*3.2*cm : a*3*(0.6+0.4*f)*cm)), jobs:0, manut:0 };
     if (b.type==='com') return { cap:0, jobs: b.dens ? Math.round(a*Math.max(3,f)*1.6) : a*3, manut:0 };
+    if (b.type==='off') return { cap:0, jobs: b.dens ? Math.round(a*Math.max(3,f)*1.8) : a*4, manut:0 };
     return { cap:0, jobs: b.dens ? a*6 : a*4, manut:0 };
   }
+  if (isMarco(b.type)) return { cap:0, jobs:MARCOS[b.type].jobs, manut:MARCOS[b.type].manut };
   if (b.type==='prefeitura') return { cap:0, jobs:4+b.s*2, manut:4+b.s*3 };
   const d = SPECIAL[b.type]; return { cap:0, jobs:d.jobs||0, manut:d.manut||0 };
 }
@@ -265,6 +296,7 @@ function makeKit(b){
   const k = new Kit(), R = rng(b.seed);
   if (b.zone) modelOf(b).f(k, R, b.fw, b.fd);
   else if (b.type==='prefeitura') prefModel(k, R, b.s);
+  else if (isMarco(b.type)) LANDMARKS[b.type](k, R);
   else SPECIAL_MODELS[b.type](k, R);
   return k;
 }
@@ -277,7 +309,7 @@ function buildGeo(b){
   b.center = new THREE.Vector3(cx, 0, cz);
   b.smoke = k.smoke.map(p => new THREE.Vector3(...p).applyMatrix4(m));
   b.floors = k.floors; b.capMul = b.zone ? (modelOf(b).capMul || 1) : 1;
-  b.height = 0.3 + (k.floors||1)*0.25;
+  b.height = isMarco(b.type) ? 3 : 0.3 + (k.floors||1)*0.25;
   k.dispose();
 }
 const anims = [];
@@ -303,7 +335,7 @@ function spawnVisual(b, animate){
   } else markChunk(b);
 }
 function placeB(o, animate){
-  const b = { id:o.id ?? nextId++, type:o.type, zone:!!o.zone, dens:o.dens||0, v:o.v||0, fw:o.fw||1, fd:o.fd||1, s:o.s||0,
+  const b = { id:o.id ?? nextId++, type:o.type, zone:!!o.zone, dens:o.dens||0, v:o.v||0, cls:o.cls||0, fw:o.fw||1, fd:o.fd||1, s:o.s||0,
               gx:o.gx, gz:o.gz, gw:o.gw, gd:o.gd, rot:o.rot||0, pop:o.pop||0, staff:0, out:0, seed:o.seed ?? (Math.random()*1e9|0), road:true };
   for (const [x,z] of footprint(b)){ const i=idx(x,z); if (grid.t[i]===T.TREE) dirty.trees=true; grid.t[i]=T.BUILD; grid.b[i]=b.id; if (!b.zone){ grid.z[i]=0; } }
   blds.set(b.id, b);
@@ -392,6 +424,9 @@ function rebuildFarms(){
 // ================== CONTAGENS ==================
 const countB = type => { let n=0; for (const b of blds.values()) if (b.type===type) n++; return n; };
 const popTotal = () => { let n=0; for (const b of blds.values()) n+=b.pop; return n; };
+const popByClass = () => { const p=[0,0,0]; for (const b of blds.values()) if (b.type==='res') p[b.cls]+=b.pop; return p; };
+const clsOk = c => S.stage >= CLASSES[c].stage;
+const marcoSlots = () => S.stage - [...blds.values()].filter(b=>isMarco(b.type)).length;
 const countRoads = () => { let n=0; for (let i=0;i<N*N;i++) if (grid.t[i]===T.ROAD||grid.t[i]===T.BRIDGE) n++; return Math.max(0, n-16); };
 const countZone = zn => { let n=0; for (let i=0;i<N*N;i++) if (grid.z[i]===zn) n++; return n; };
 const prefB = () => [...blds.values()].find(b=>b.type==='prefeitura');
@@ -405,6 +440,7 @@ function computeLand(list){
     if (b.type==='ind') mark(b, b.dens?3:2, poll);
     else if (b.type==='processadora') mark(b, 2, poll);
     else if (b.type==='parque') mark(b, 3, park);
+    else if (isMarco(b.type)) mark(b, 6, park);
   }
   const pf = list.find(b=>b.type==='prefeitura');
   for (let i=0;i<N*N;i++){
@@ -415,6 +451,11 @@ function computeLand(list){
 }
 
 // ================== SIMULAÇÃO ==================
+function jobKey(b){
+  if (b.type==='com') return b.dens ? 'com1' : 'com0';
+  if (isMarco(b.type)) return 'marco';
+  return b.type;
+}
 function tick(){
   S.day++;
   const list = [...blds.values()];
@@ -422,22 +463,40 @@ function tick(){
   computeLand(list);
 
   const houses = list.filter(b=>b.type==='res');
-  const pop = houses.reduce((s,b)=>s+b.pop,0);
-  const workers = Math.floor(pop*0.5);
+  const popC = [0,0,0]; for (const h of houses) popC[h.cls] += h.pop;
+  const pop = popC[0]+popC[1]+popC[2];
+  const pool = popC.map(p=>Math.floor(p*0.5));
+  const workers = pool.reduce((a,b)=>a+b,0);
+  // empregos agrupados por quem pode trabalhar
   const jobB = list.filter(b=>bStat(b).jobs && b.road);
   const farmL = [...farms.values()].filter(f=>f.barn>=0);
-  const totalJobs = jobB.reduce((s,b)=>s+bStat(b).jobs,0) + farmL.reduce((s,f)=>s+farmJobs(f),0);
-  const ratio = totalJobs ? Math.min(1, workers/totalJobs) : 0;
+  const groups = {};
+  for (const b of jobB){ const k = jobKey(b); (groups[k] ||= { jobs:0, items:[] }); groups[k].jobs += bStat(b).jobs; groups[k].items.push(b); }
+  if (farmL.length){ groups.fazenda ||= { jobs:0, items:[] }; for (const f of farmL){ groups.fazenda.jobs += farmJobs(f); groups.fazenda.items.push(f); } }
+  const order = ['ind','fazenda','processadora','prefeitura','off','com1','com0','marco'];
+  const free = [0,0,0];
+  let totalJobs = 0;
+  for (const k of order){
+    const g = groups[k]; if (!g) continue; totalJobs += g.jobs;
+    let need = g.jobs;
+    for (const c of JOBCLS[k]){ const t = Math.min(need, pool[c]); pool[c] -= t; need -= t; }
+    g.ratio = g.jobs ? (g.jobs-need)/g.jobs : 0;
+    for (const c of JOBCLS[k]) free[c] += need;
+  }
   for (const b of list){ b.staff=0; b.out=0; }
   for (const f of farms.values()){ f.staff=0; f.out=0; }
-  for (const b of jobB) b.staff = Math.round(bStat(b).jobs*ratio);
-  for (const f of farmL) f.staff = Math.round(farmJobs(f)*ratio);
-  const unemployed = Math.max(0, workers-totalJobs);
+  for (const k in groups) for (const it of groups[k].items) it.staff = Math.round((it.tiles ? farmJobs(it) : bStat(it).jobs) * groups[k].ratio);
+  const unemployed = pool.reduce((a,b)=>a+b,0);
   const sr = b => b.staff/bStat(b).jobs;
 
   for (const f of farmL){ const p = farmLots(f)*0.4*EQUIP[f.level].mult*(f.staff/farmJobs(f)); S.trigo += p; f.out = p; }
   for (const b of jobB) if (b.type==='processadora'){ const use = Math.min(S.trigo, 6*sr(b)); S.trigo -= use; S.alim += use; b.out = use; }
   for (const b of jobB) if (b.type==='ind'){ const p = bStat(b).jobs*0.2*sr(b); S.merc += p; b.out = p; }
+
+  // turismo
+  const marcos = list.filter(b=>isMarco(b.type) && b.road);
+  for (const m of marcos) m.out = MARCOS[m.type].visit * (0.4 + 0.6*sr(m)) * (0.5 + S.happy/200);
+  const visit = marcos.reduce((s,m)=>s+m.out,0); S.visit = visit;
 
   const shops = jobB.filter(b=>b.type==='com');
   const capOf = b => bStat(b).jobs*1.4*sr(b);
@@ -445,7 +504,8 @@ function tick(){
   const dF = pop*0.05, dG = pop*0.04;
   const sF = Math.min(dF, S.alim, cap); S.alim -= sF;
   const sG = Math.min(dG, S.merc, cap - sF); S.merc -= sG;
-  for (const b of shops) b.out = cap ? (sF+sG)*capOf(b)/cap : 0;
+  const sT = Math.min(visit*0.1, Math.max(0, cap - sF - sG));
+  for (const b of shops) b.out = cap ? (sF+sG+sT)*capOf(b)/cap : 0;
   let export_ = 0;
   if (S.merc > 60){ export_ = Math.min(S.merc-60, 10); S.merc -= export_; }
   if (S.trigo > 200){ const e = Math.min(S.trigo-200, 10); S.trigo -= e; export_ += e*0.5; }
@@ -453,36 +513,40 @@ function tick(){
   const small = pop <= 25;
   const foodR = small ? 1 : (dF ? sF/dF : 1);
   const goodsR = small ? 1 : (dG ? sG/dG : 1);
-  const comStaff = shops.reduce((s,b)=>s+b.staff,0), indStaff = jobB.filter(b=>b.type==='ind').reduce((s,b)=>s+b.staff,0);
-  const taxes = pop*0.15 + comStaff*0.2 + indStaff*0.2;
+  const staffOf = t => jobB.filter(b=>b.type===t).reduce((s,b)=>s+b.staff,0);
+  const taxes = popC[0]*CLASSES[0].tax + popC[1]*CLASSES[1].tax + popC[2]*CLASSES[2].tax + staffOf('com')*0.2 + staffOf('ind')*0.2 + staffOf('off')*0.35;
+  const tourism = visit*0.6 + sT*1.5;
   const sales = sF*0.6 + sG*0.8 + export_*0.5;
   let maint = countRoads()*0.1 + pop*0.06; for (const b of list) maint += bStat(b).manut;
   for (const f of farms.values()) maint += farmLots(f)*0.05*f.level;
-  S.inc = taxes + sales - maint; S.money += S.inc;
+  S.inc = taxes + sales + tourism - maint; S.money += S.inc;
   S.trigo = Math.min(S.trigo, 999); S.alim = Math.min(S.alim, 999); S.merc = Math.min(S.merc, 999);
 
   let nearPark = 0, polluted = 0;
   for (const h of houses){ const fp = footprint(h); if (fp.some(([x,z])=>park[idx(x,z)])) nearPark++; if (fp.some(([x,z])=>poll[idx(x,z)])) polluted++; }
   const nH = Math.max(1, houses.length);
   const unempR = (!small && workers>0) ? unemployed/workers : 0;
-  const target = clamp(30 + 38*foodR + 10*goodsR + 15*nearPark/nH + (prefB()?6:0) - 45*unempR - 25*polluted/nH, 0, 100);
+  const target = clamp(30 + 38*foodR + 10*goodsR + 15*nearPark/nH + (prefB()?6:0) + Math.min(8, marcos.length*3) - 45*unempR - 25*polluted/nH, 0, 100);
   S.happy += (target - S.happy)*0.12;
 
-  const comJobs = list.filter(b=>b.type==='com').reduce((s,b)=>s+bStat(b).jobs,0);
-  const indJobs = list.filter(b=>b.type==='ind').reduce((s,b)=>s+bStat(b).jobs,0);
-  const dR = clamp((totalJobs - workers + 8 + (pop<40?14:0)) / (10 + pop*0.12) - (S.happy<40?0.5:0), -1, 1);
-  const dC = clamp((pop*0.2 + 3 - comJobs) / (4 + pop*0.05), -1, 1);
-  const dI = clamp((pop*0.28 + 4 - indJobs) / (5 + pop*0.06), -1, 1);
-  S.dem = [dR, dC, dI];
+  // demanda: residencial por classe, comércio, indústria, escritórios
+  const jobsOf = t => list.filter(b=>b.type===t).reduce((s,b)=>s+bStat(b).jobs,0);
+  const base = [8 + (pop<40?14:0), 5, 3];
+  S.demR = [0,1,2].map(c => !clsOk(c) ? -1 : clamp((free[c] - pool[c] + base[c]) / (8 + popC[c]*0.15) - (S.happy<40?0.5:0), -1, 1));
+  const dR = Math.max(...S.demR);
+  const dC = clamp((pop*0.18 + 3 + visit*0.08 - jobsOf('com')) / (4 + pop*0.05), -1, 1);
+  const dI = clamp((pop*0.22 + 4 - jobsOf('ind')) / (5 + pop*0.06), -1, 1);
+  const dO = S.stage < 1 ? -1 : clamp(((popC[1]+popC[2])*0.3 + 4 - jobsOf('off')) / (5 + pop*0.05), -1, 1);
+  S.dem = [dR, dC, dI, dO];
 
   growZones();
   const gChance = S.happy>=40 && dR>-0.4 ? (S.happy-35)/65*0.35 : 0;
-  for (const h of houses){ const c = bStat(h).cap; if (h.road && h.pop<c && Math.random()<gChance) h.pop = Math.min(c, h.pop + Math.max(1, Math.round(c*0.12*Math.random()))); }
+  for (const h of houses){ const c = bStat(h).cap; if (h.road && h.pop<c && S.demR[h.cls] > -0.5 && Math.random()<gChance) h.pop = Math.min(c, h.pop + Math.max(1, Math.round(c*0.12*Math.random()))); }
   if (S.happy < 35) for (const h of houses) if (h.pop>0 && Math.random() < (35-S.happy)/35*0.15) h.pop--;
+  climbClass(houses);
 
-  // etapas
   const p2 = popTotal();
-  while (S.stage < STAGES.length-1 && p2 >= STAGES[S.stage+1].pop){ S.stage++; toast(`Agora você é ${STAGES[S.stage].nome}!`, 'city'); updateDens(); }
+  while (S.stage < STAGES.length-1 && p2 >= STAGES[S.stage+1].pop){ S.stage++; toast(`Agora você é ${STAGES[S.stage].nome}!`, 'city'); onStageUp(); }
 
   const A = [];
   if (list.some(b=>!b.road)) A.push(['warn','Prédio sem acesso à rua']);
@@ -496,12 +560,33 @@ function tick(){
     else A.push(['bread','Falta comida: aumente as fazendas ou compre equipamentos']);
   }
   if (!small && goodsR < 0.7 && shops.length) A.push(['box','Lojas sem mercadorias: pinte zona industrial']);
-  if (unempR > 0.25) A.push(['job','Desemprego: pinte zonas comerciais ou industriais']);
+  if (unempR > 0.25) A.push(['job', S.stage>=1 && pool[1]+pool[2] > pool[0] ? 'Desemprego na classe média e alta: pinte escritórios' : 'Desemprego: pinte zonas comerciais ou industriais']);
   if (polluted/nH > 0.2) A.push(['smog','Indústria perto das casas deixa moradores infelizes']);
-  if (totalJobs && ratio < 0.6) A.push(['pop','Faltam trabalhadores: pinte zona residencial']);
+  if (totalJobs && workers/totalJobs < 0.6) A.push(['pop','Faltam trabalhadores: pinte zona residencial']);
   if (S.money < 0) A.push(['money-bad','Cofres no vermelho']);
   S.alerts = A;
   checkGoals();
+}
+function onStageUp(){
+  updateDens(); buildToolbar();
+  const c = CLASSES.findIndex(k=>k.stage===S.stage);
+  if (c > 0) setTimeout(()=>toast(`Classe ${CLASSES[c].nome.toLowerCase()} chegando à cidade`, 'pop'), 2300);
+}
+// famílias sobem de classe: a casa é reformada para um modelo melhor
+function climbClass(houses){
+  for (const h of houses){
+    if (h.cls >= 2 || !clsOk(h.cls+1) || h.anim) continue;
+    const st = bStat(h); if (h.pop < st.cap*0.9) continue;
+    const v = lv[idx(h.gx,h.gz)]; if (v < [0.5,0.66][h.cls] || S.happy < 55) continue;
+    if (Math.random() > 0.015) continue;
+    const list = ZONE_MODELS.res[h.dens];
+    const opts = list.map((m,i)=>[m,i]).filter(([m])=>m.lux===h.cls+1 && m.sizes.some(([a,b])=>a===h.fw&&b===h.fd));
+    if (!opts.length) continue;
+    const [, vi] = opts[Math.random()*opts.length|0];
+    unspawn(h); h.cls++; h.v = vi; h.seed = Math.random()*1e9|0;
+    spawnVisual(h, true); h.pop = Math.min(h.pop, bStat(h).cap);
+    dirty.zones = true;
+  }
 }
 
 // encontra lotes livres e escolhe o modelo (maior que couber, ponderado pelo valor do terreno)
@@ -513,14 +598,15 @@ function lotTiles(x, z, dx, dz, fw, fd, o){
   return r;
 }
 function growZones(){
-  const cand = [[],[],[],[]];
+  const cand = [[],[],[],[],[]];
   for (let z=0;z<N;z++) for (let x=0;x<N;x++){
     const i = idx(x,z), zn = grid.z[i];
     if (zn && free(grid.t[i]) && roadAdj1(x,z)) cand[zn].push([x,z]);
   }
   const maxA = STAGES[S.stage].maxArea;
-  for (let zn=1; zn<=3; zn++){
-    const d = S.dem[zn-1]; if (d <= 0.05 || !cand[zn].length) continue;
+  const demOf = [0, S.dem[0], S.dem[1], S.dem[2], S.dem[3]];
+  for (let zn=1; zn<=4; zn++){
+    const d = demOf[zn]; if (d <= 0.05 || !cand[zn].length) continue;
     const tries = 1 + Math.floor(d*3);
     for (let t=0; t<tries && cand[zn].length; t++){
       if (Math.random() > d*0.85) continue;
@@ -528,18 +614,24 @@ function growZones(){
       const i0 = idx(x,z); if (!free(grid.t[i0])) continue;
       const dens = grid.d[i0]; if (dens && !highOk()) continue;
       const type = ZKEY[zn], list = ZONE_MODELS[type][dens];
-      const bucket = lv[i0] < 0.35 ? 0 : lv[i0] < 0.6 ? 1 : 2;
+      // classe que se muda: sorteada pela demanda de cada classe, limitada pelo valor do terreno
+      let cls = 0;
+      if (type==='res'){
+        const w = S.demR.map((v,c)=> v>0.05 ? v : 0);
+        let tot = w.reduce((a,b)=>a+b,0), r = Math.random()*tot;
+        for (let c=0;c<3;c++){ r -= w[c]; if (r <= 0 && w[c] > 0){ cls = c; break; } }
+        while (cls > 0 && lv[i0] < [0,0.3,0.5][cls]) cls--;
+      }
       const dirs = DIRS.filter(([,dx,dz])=>isRoad(x+dx,z+dz));
       const opts = [];
       for (const [rot,dx,dz] of dirs) list.forEach((m,v)=>{
+        if (type==='res' && m.lux !== cls) return;
         for (const [fw,fd] of m.sizes){
           const a = fw*fd; if (a > maxA) continue;
           for (let o=0;o<fw;o++){
             const tiles = lotTiles(x,z,dx,dz,fw,fd,o);
             if (!tiles.every(([tx,tz])=>inb(tx,tz) && grid.z[idx(tx,tz)]===zn && grid.d[idx(tx,tz)]===dens && free(grid.t[idx(tx,tz)]))) continue;
-            let w = Math.pow(a, type==='res' ? 0.9 : 1.1);
-            if (type==='res' && m.lux!==undefined) w *= [3,1,0.2][Math.abs(m.lux-bucket)];
-            opts.push({ w, rot, v, fw, fd, tiles, dz });
+            opts.push({ w:Math.pow(a, type==='res' ? 0.9 : 1.1), rot, v, fw, fd, tiles });
           }
         }
       });
@@ -548,7 +640,7 @@ function growZones(){
       for (const o of opts){ r -= o.w; if (r <= 0){ pickO = o; break; } }
       const xs = pickO.tiles.map(t=>t[0]), zs = pickO.tiles.map(t=>t[1]);
       const gx = Math.min(...xs), gz = Math.min(...zs), gw = Math.max(...xs)-gx+1, gd = Math.max(...zs)-gz+1;
-      placeB({ type, zone:true, dens, v:pickO.v, fw:pickO.fw, fd:pickO.fd, gx, gz, gw, gd, rot:pickO.rot, pop: type==='res' ? 1 : 0 }, true);
+      placeB({ type, zone:true, dens, cls, v:pickO.v, fw:pickO.fw, fd:pickO.fd, gx, gz, gw, gd, rot:pickO.rot, pop: type==='res' ? 1 : 0 }, true);
     }
   }
 }
@@ -613,8 +705,8 @@ function upgradeAllFarms(){
 // ================== SALVAR ==================
 function save(){
   try{
-    const data = { v:3, S:{...S, alerts:[]}, t:Array.from(grid.t), z:Array.from(grid.z), d:Array.from(grid.d), nextId,
-      b:[...blds.values()].map(b=>({ id:b.id, type:b.type, zone:b.zone, dens:b.dens, v:b.v, fw:b.fw, fd:b.fd, s:b.s, gx:b.gx, gz:b.gz, gw:b.gw, gd:b.gd, rot:b.rot, pop:b.pop, seed:b.seed })),
+    const data = { v:4, S:{...S, alerts:[]}, t:Array.from(grid.t), z:Array.from(grid.z), d:Array.from(grid.d), nextId,
+      b:[...blds.values()].map(b=>({ id:b.id, type:b.type, zone:b.zone, dens:b.dens, cls:b.cls, v:b.v, fw:b.fw, fd:b.fd, s:b.s, gx:b.gx, gz:b.gz, gw:b.gw, gd:b.gd, rot:b.rot, pop:b.pop, seed:b.seed })),
       f:[...farms.values()].map(f=>({ id:f.id, tiles:[...f.tiles], level:f.level, seed:f.seed })) };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
   }catch(e){}
@@ -622,7 +714,7 @@ function save(){
 function load(){
   try{
     const raw = localStorage.getItem(SAVE_KEY); if (!raw) return false;
-    const d = JSON.parse(raw); if (d.v!==3) return false;
+    const d = JSON.parse(raw); if (d.v!==4) return false;
     S = Object.assign(fresh(), d.S);
     grid.t.set(d.t); grid.z.set(d.z); grid.d.set(d.d); grid.b.fill(-1); grid.f.fill(-1);
     for (let i=0;i<N*N;i++) if (grid.t[i]===T.BUILD || grid.t[i]===T.FARM) grid.t[i]=T.EMPTY;
@@ -654,7 +746,7 @@ function pick3(cx, cy){
 const pvGeo = new THREE.BoxGeometry(1,1,1);
 const mk = (c,o=0.45) => new THREE.MeshBasicMaterial({ color:c, transparent:true, opacity:o, depthWrite:false });
 const pvOk = mk('#5fd35a'), pvBad = mk('#e5533f'), pvSkip = mk('#ffffff',0.22), pvFarm = mk('#e7cd63',0.6);
-const pvZone = [null, [mk('#5fbf4a',0.6),mk('#2f8f3a',0.6)], [mk('#4f8fe0',0.6),mk('#2f5fb8',0.6)], [mk('#e6b43a',0.6),mk('#c4801e',0.6)]];
+const pvZone = [null, [mk('#5fbf4a',0.6),mk('#2f8f3a',0.6)], [mk('#4f8fe0',0.6),mk('#2f5fb8',0.6)], [mk('#e6b43a',0.6),mk('#c4801e',0.6)], [mk('#a07ae0',0.6),mk('#7350c0',0.6)]];
 const pvPool = []; const pvGroup = new THREE.Group(); world.add(pvGroup);
 function pvTile(i, x, z, mat, w=1, h=0.08){
   let m = pvPool[i]; if (!m){ m = new THREE.Mesh(pvGeo, pvOk); m.renderOrder=5; pvPool[i]=m; pvGroup.add(m); }
@@ -670,7 +762,7 @@ let ghost = null;
 function setGhost(type){
   if (ghost){ world.remove(ghost); disposeObj(ghost); ghost=null; }
   if (!type) return;
-  const k = new Kit(); if (type==='prefeitura') prefModel(k, rng(42), 2); else SPECIAL_MODELS[type](k, rng(42));
+  const k = new Kit(); if (type==='prefeitura') prefModel(k, rng(42), 2); else if (isMarco(type)) LANDMARKS[type](k, rng(42)); else SPECIAL_MODELS[type](k, rng(42));
   ghost = kitObject(k);
   ghost.traverse(o=>{ if (o.isMesh){ o.material = ghostMat; o.castShadow=false; } if (o.isLineSegments) o.visible=false; });
   ghost.visible = false; world.add(ghost);
@@ -701,6 +793,7 @@ function plan(a, b){
     return { items, cost, n, label:`Rua · ${n} trechos · R$ ${fmt(cost)}` };
   }
   if (tl.zone){
+    if (tl.stage && S.stage < tl.stage) return { items:[], cost:0, n:0, err:'lock', label:`Libera em ${STAGES[tl.stage].nome}` };
     const items=[]; let n=0;
     for (const [x,z] of rect(a,b)){ if (!inb(x,z)) continue; if (free(grid.t[idx(x,z)])){ items.push([x,z,'zone']); n++; } else items.push([x,z,'skip']); }
     return { items, cost:0, n, zone:tl.zone, label:`${ZNAME[tl.zone]} ${zoneDens?'alta':'comum'} · ${n} lotes` };
@@ -736,7 +829,9 @@ function plan(a, b){
     const d = SPECIAL[tool]; let err = null;
     for (const [x,z] of sqTiles(d.w, b.ax, b.az)){ if (!inb(x,z)){ err='Fora do mapa'; break; } if (!free(grid.t[idx(x,z)])){ err='Espaço ocupado'; break; } }
     if (!err && roadSide(d.w,b.ax,b.az)===null) err = 'Precisa de rua ao lado';
-    if (!err && d.unique && countB(tool)) err = 'Só pode existir uma';
+    if (!err && d.marco && S.stage < 1) err = `Marcos liberam em ${STAGES[1].nome}`;
+    if (!err && d.unique && countB(tool)) err = d.marco ? 'Esse marco já existe' : 'Só pode existir uma';
+    if (!err && d.marco && marcoSlots() <= 0) err = 'Sem vaga: cada etapa libera 1 marco';
     if (!err && S.money < d.custo) err = 'Dinheiro insuficiente';
     return { building:true, ax:b.ax, az:b.az, ok:!err, err, cost:d.custo, label: err || `${d.nome} · R$ ${fmt(d.custo)}` };
   }
@@ -761,9 +856,11 @@ function commit(pl){
     S.money -= pl.cost;
     const w = SPECIAL[tool].w;
     placeB({ type:tool, s: tool==='prefeitura' ? 2 : 0, gx:pl.ax, gz:pl.az, gw:w, gd:w, rot:roadSide(w,pl.ax,pl.az) ?? 0 }, true);
+    if (isMarco(tool)) toast(`${SPECIAL[tool].nome} inaugurado!`, 'star');
     afterChange(); return;
   }
   if (pl.zone){
+    if (pl.err){ toast(pl.label, 'lock'); return; }
     for (const [x,z,s] of pl.items) if (s==='zone'){ const i=idx(x,z); grid.z[i]=pl.zone; grid.d[i]=zoneDens; }
     dirty.zones = true; afterChange(); return;
   }
@@ -889,14 +986,18 @@ function renderInfo(){
   }
   const b = blds.get(selected.id); if (!b){ closeInfo(); return; }
   const st = bStat(b), rows = [];
-  const icon = b.zone ? (b.dens ? 'high' : {res:'res',com:'com',ind:'ind'}[b.type]) : SPECIAL[b.type].ic;
-  const sub = b.zone ? `${ZNAME[{res:1,com:2,ind:3}[b.type]]} · ${b.dens?'alta densidade':'comum'} · ${b.fw}×${b.fd}` : (b.type==='prefeitura' ? `${b.s}×${b.s} · ${STAGES[S.stage].nome}` : 'Prédio especial');
+  const icon = b.zone ? (b.dens ? 'high' : {res:'res',com:'com',ind:'ind',off:'off'}[b.type]) : SPECIAL[b.type].ic;
+  const sub = b.zone ? `${ZNAME[{res:1,com:2,ind:3,off:4}[b.type]]} · ${b.dens?'alta densidade':'comum'} · ${b.fw}×${b.fd}` : (b.type==='prefeitura' ? `${b.s}×${b.s} · ${STAGES[S.stage].nome}` : isMarco(b.type) ? 'Marco da cidade' : 'Prédio especial');
+  if (b.type==='res') rows.push(['Classe', `<span class="cls" style="background:${CLASSES[b.cls].cor}"></span>${CLASSES[b.cls].nome}`]);
   if (b.type==='res') rows.push(['Moradores', `${b.pop} / ${st.cap}`]);
+  if (isMarco(b.type)) rows.push(['Visitantes', `${Math.round(b.out)}/dia`]);
+  if (b.type==='prefeitura'){ const pc = popByClass(); CLASSES.forEach((c,i)=>{ if (clsOk(i)) rows.push([`Classe ${c.nome.toLowerCase()}`, fmt(pc[i])]); }); if (S.visit) rows.push(['Turistas', `${Math.round(S.visit)}/dia`]); }
   if (st.jobs) rows.push(['Funcionários', `${b.staff} / ${st.jobs}`]);
   if (b.zone && b.floors > 1) rows.push(['Andares', b.floors]);
   if (b.type==='processadora') rows.push(['Alimento', `${b.out.toFixed(1)}/dia`]);
   if (b.type==='ind') rows.push(['Mercadorias', `${b.out.toFixed(1)}/dia`]);
   if (b.type==='com') rows.push(['Vendas', `${b.out.toFixed(1)}/dia`]);
+  if (b.type==='off') rows.push(['Impostos', `R$ ${(b.staff*0.35).toFixed(1)}/dia`]);
   if (b.type==='parque') rows.push(['Efeito', 'Casas felizes']);
   if (b.zone) rows.push(['Valor do terreno', `${Math.round(lv[idx(b.gx,b.gz)]*100)}%`]);
   if (st.manut) rows.push(['Manutenção', `R$ ${st.manut}/dia`]);
@@ -937,16 +1038,50 @@ $('#rotL').onclick = ()=>rotateCam(1);
 $('#rotR').onclick = ()=>rotateCam(-1);
 
 // ================== UI ==================
-const tb = $('#toolbar');
-TOOLS.forEach(t=>{
-  const b = document.createElement('button'); b.className = 'tool panel' + (t.sep ? ' sepl' : ''); b.dataset.tool = t.id;
-  b.innerHTML = `${ico(t.ic)}<span class="nm">${t.nome}</span><span class="c">${t.custo ? 'R$ '+fmt(t.custo) : (t.sub || (t.zone ? 'zona' : '&nbsp;'))}</span>${t.tag?`<i class="tag" style="background:${t.tag}"></i>`:''}`;
-  b.onclick = ()=>selectTool(t.id); tb.appendChild(b);
-});
+let cat = null;
+function toolLocked(t){ return t.stage && S.stage < t.stage; }
+function buildToolbar(){
+  const tb = $('#toolbar');
+  tb.innerHTML = '';
+  CATS.forEach(c=>{
+    const b = document.createElement('button'); b.className = 'cat'; b.dataset.cat = c.id; b.style.setProperty('--bg', c.cor);
+    b.innerHTML = `${ico(c.ic)}<span>${c.nome}</span>`;
+    b.onclick = ()=>openCat(c.id); tb.appendChild(b);
+  });
+  renderTray(); markTools();
+}
+function openCat(id){
+  if (id==='ver' || id==='demolir'){ cat = null; selectTool(id==='ver' ? 'ver' : (tool==='demolir' ? 'ver' : 'demolir')); return; }
+  cat = (cat===id) ? null : id;
+  renderTray(); markTools();
+}
+function renderTray(){
+  const tr = $('#tray');
+  document.body.classList.toggle('tray-open', !!cat);
+  if (!cat){ tr.style.display = 'none'; return; }
+  const c = CATS.find(c=>c.id===cat);
+  tr.style.display = 'flex'; tr.style.setProperty('--bg', c.cor);
+  tr.innerHTML = `<div class="trayHead">${ico(c.ic)}${c.nome}${cat==='marcos' ? `<small>${S.stage<1 ? 'libera na Cidade pequena' : marcoSlots() > 0 ? `${marcoSlots()} vaga${marcoSlots()>1?'s':''}` : 'sem vaga nesta etapa'}</small>` : ''}</div><div class="trayItems"></div>`;
+  const box = tr.querySelector('.trayItems');
+  TOOLS.filter(t=>t.cat===cat).forEach(t=>{
+    const b = document.createElement('button'); const lock = toolLocked(t), built = isMarco(t.id) && countB(t.id);
+    b.className = 'tool' + (lock ? ' locked' : '') + (built ? ' done' : ''); b.dataset.tool = t.id;
+    b.innerHTML = `<span class="ib">${ico(lock ? 'lock' : t.ic)}</span><span class="nm">${t.nome}</span><span class="c">${built ? 'construído' : lock ? STAGES[t.stage].nome : t.custo ? 'R$ '+fmt(t.custo) : (t.sub || (t.zone ? 'zona' : ''))}</span>${t.tag?`<i class="tag" style="background:${t.tag}"></i>`:''}`;
+    b.onclick = ()=>{ if (lock){ toast(`Libera em ${STAGES[t.stage].nome} (${fmt(STAGES[t.stage].pop)} moradores)`, 'lock'); return; } selectTool(t.id); };
+    box.appendChild(b);
+  });
+  markTools();
+}
+function markTools(){
+  const tc = curTool().cat;
+  document.querySelectorAll('.cat').forEach(b=>b.classList.toggle('on', cat ? b.dataset.cat===cat : b.dataset.cat===tc));
+  document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('on', b.dataset.tool===tool));
+}
 function selectTool(id){
   if (tool===id && id!=='ver') id = 'ver';
   tool = id; drag = null; clearPreview();
-  document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('on', b.dataset.tool===id));
+  if (id==='ver'){ cat = null; renderTray(); }
+  markTools();
   gridLines.visible = id!=='ver';
   setGhost(SPECIAL[id] ? id : null);
   setControlsForTool();
@@ -976,16 +1111,21 @@ function showTip(txt, x, y, bad){ const t=$('#tip'); t.textContent=txt; t.style.
 function hideTip(){ $('#tip').style.display='none'; }
 function layoutPanels(){ const hb = $('#hud').getBoundingClientRect().bottom + 6; $('#goal').style.top = hb+'px'; $('#info').style.top = hb+'px'; }
 addEventListener('resize', layoutPanels);
+function barHtml(b){
+  if (b.lock) return `<div class="tr lock" title="bloqueado">${ico('lock')}</div>`;
+  const hh = Math.abs(b.v)*50;
+  return `<div class="tr${b.r?' thin':''}"><i style="background:${b.v>=0?b.col:'#c9483a'};height:${hh}%;top:${b.v>=0?50-hh:50}%"></i></div>`;
+}
 function updateHUD(){
   let pop=0, cap=0; for (const b of blds.values()) if (b.type==='res'){ pop+=b.pop; cap+=bStat(b).cap; }
   const h = Math.round(S.happy), face = h>=70?'f3':h>=50?'f2':h>=30?'f1':'f0';
   const inc = S.inc>=0 ? `<small class="pos">+${fmt(S.inc)}</small>` : `<small class="neg">${fmt(S.inc)}</small>`;
   $('#stats').innerHTML = [
-    `${ico('coin')}${fmt(S.money)} ${inc}`,
-    `${ico('pop')}${fmt(pop)}<small>/${fmt(cap)}</small>`,
-    `${ico(face)}${h}%`,
-    `${ico('wheat')}${fmt(S.trigo)}<i class="sep"></i>${ico('bread')}${fmt(S.alim)}<i class="sep"></i>${ico('box')}${fmt(S.merc)}`,
-    `${ico('cal')}${S.day}`,
+    `${ib('coin')}${fmt(S.money)} ${inc}`,
+    `${ib('pop')}${fmt(pop)}<small>/${fmt(cap)}</small>`,
+    `${ib(face)}${h}%`,
+    `${ib('wheat')}${fmt(S.trigo)}<i class="sep"></i>${ico('bread')}${fmt(S.alim)}<i class="sep"></i>${ico('box')}${fmt(S.merc)}`,
+    `${ib('cal')}${S.day}`,
   ].map((s,i)=>`<div class="chip panel${i===4?' opt':''}">${s}</div>`).join('');
   layoutPanels();
   const g = $('#goal'), st = STAGES[S.stage], nx = STAGES[S.stage+1];
@@ -996,11 +1136,15 @@ function updateHUD(){
   } else g.innerHTML = `${stLine}<b>${ico('star')}Metas concluídas</b>Continue crescendo sua cidade!`;
   const al = $('#alert');
   if (S.alerts.length && !curTool().zone){ al.innerHTML = ico(S.alerts[0][0]) + S.alerts[0][1]; al.style.display='flex'; } else al.style.display='none';
-  const cols = ['#5fbf4a','#4f8fe0','#e6b43a'];
-  ['dR','dC','dI'].forEach((id,i)=>{ const v = S.dem[i], el = $('#'+id), hh = Math.abs(v)*50;
-    el.style.background = v>=0 ? cols[i] : '#c9483a'; el.style.height = hh+'%'; el.style.top = v>=0 ? (50-hh)+'%' : '50%'; });
+  const bars = [
+    ...CLASSES.map((c,i)=>({ v:S.demR[i], col:c.cor, lab:['B','M','A'][i], lock:!clsOk(i), r:true })),
+    { v:S.dem[1], col:'#4f8fe0', lab:'C' }, { v:S.dem[2], col:'#e6b43a', lab:'I' }, { v:S.dem[3], col:'#a07ae0', lab:'E', lock:S.stage<1 },
+  ];
+  $('#rci').innerHTML = `<div class="rgrp"><div class="cols">${bars.slice(0,3).map(barHtml).join('')}</div><span class="lab" style="color:#3f8f33">R</span></div>` + bars.slice(3).map(b=>`<div class="rgrp"><div class="cols">${barHtml(b)}</div><span class="lab" style="color:${b.col}">${b.lab}</span></div>`).join('');
   if (selected) renderInfo();
+  if (cat==='marcos' || cat==='bairros') { const sig = S.stage+'|'+marcoSlots()+'|'+countB('torretv')+countB('catedral')+countB('estadio')+countB('parquecentral'); if (sig!==trSig){ trSig = sig; renderTray(); } }
 }
+let trSig = '';
 const show = (id,on)=>$(id).style.display = on ? 'grid' : 'none';
 let speedBeforeMenu = 1;
 $('#menuBtn').onclick = ()=>{ speedBeforeMenu = S.speed; setSpeed(0); show('#menu',true); };
@@ -1077,10 +1221,10 @@ document.addEventListener('visibilitychange', ()=>{ if (document.hidden) save();
 S = fresh();
 if (!load()) genTerrain(7);
 rebuildAll();
-selectTool('ver'); setSpeed(S.speed ?? 1);
+buildToolbar(); selectTool('ver'); setSpeed(S.speed ?? 1);
 updateHUD();
 $('#loading').remove();
 let seenHelp = false; try{ seenHelp = !!localStorage.getItem(SAVE_KEY+'_help') || !!localStorage.getItem('cidade_proto_v2_help'); }catch(e){}
 if (!seenHelp){ speedBeforeMenu = S.speed || 1; setSpeed(0); show('#help', true); }
-window.__game = { get S(){return S;}, blds, farms, grid, placeB, tick, camera, controls, selectTool, commit, plan, idx, T, N, Z, STAGES, rebuildAll, ZONE_MODELS, setZoneDens:d=>{zoneDens=d;}, dirty, expandPref, upgradeFarm, upgradeAllFarms, newFarm, lv };
+window.__game = { openCat, get S(){return S;}, blds, farms, grid, placeB, tick, camera, controls, selectTool, commit, plan, idx, T, N, Z, STAGES, rebuildAll, ZONE_MODELS, setZoneDens:d=>{zoneDens=d;}, dirty, expandPref, upgradeFarm, upgradeAllFarms, newFarm, lv };
 requestAnimationFrame(frame);

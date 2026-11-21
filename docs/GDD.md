@@ -33,7 +33,7 @@ O protótipo roda no navegador com Three.js, o que permite testar no celular e n
 - **Fontes:** Lilita One em títulos, números e botões; Baloo 2 nos textos.
 - **Ícones:** conjunto próprio em SVG. Nenhum emoji no jogo.
 - **HUD:** dinheiro com saldo do dia, população, felicidade, estoque (trigo, alimento, mercadorias), dia, etapa da cidade, meta atual e barras de demanda R C I.
-- **Ferramentas:** Ver, Rua, Casas, Comércio, Indústria, Fazenda, Alimentos, Prefeitura, Praça, Árvore, Demolir.
+- **Ferramentas por categoria:** Ver; Obras (rua, árvore, demolir); Bairros (casas, comércio, indústria, escritórios); Produção (fazenda, alimentos); Cidade (prefeitura, praça); Marcos.
 - **Celular:** um dedo move a câmera no modo Ver; construindo, um dedo constrói e dois dedos movem e dão zoom. Botões para girar.
 - **PC:** WASD ou setas, roda do mouse, Q/E para girar, teclas 1 a 9 para ferramentas.
 
@@ -115,7 +115,7 @@ Cadeias: fazenda → fábrica de alimentos → comércio → moradores; indústr
 - **Poluição:** indústria comum polui 2 lotes ao redor, alta 3; fábrica de alimentos 2.
 - **Demanda R/C/I:** R sobe com vagas sobrando; C alvo de 0,2 emprego por morador; I alvo de 0,28.
 
-## Classes sociais e etapas da cidade (Entrega B)
+## Classes sociais e etapas da cidade (Entrega B, feita)
 
 | Moradores | Etapa | Libera |
 | --- | --- | --- |
@@ -136,6 +136,16 @@ Cadeias: fazenda → fábrica de alimentos → comércio → moradores; indústr
 - **Bairro misto:** a zona residencial é uma só; controle fino virá com distritos.
 - **Marcos:** estádio, catedral, torre de TV, parque central; caros, com manutenção, trazem turistas.
 
+### Como ficou no jogo (Entrega B)
+
+- **Empregos por classe:** indústria, fazendas e fábrica de alimentos só classe baixa; comércio comum baixa e média; comércio alto e escritórios média e alta; prefeitura média.
+- **Classe que se muda:** sorteada pela demanda de cada classe; média exige terreno com valor de 30% e alta de 50%.
+- **Impostos por morador:** baixa R$ 0,10, média R$ 0,20, alta R$ 0,40; funcionário de escritório R$ 0,35.
+- **Subir de classe:** casa cheia, felicidade de 55% e terreno valorizado (50% para média, 66% para alta); a casa é reformada para um modelo do mesmo tamanho.
+- **Escritórios:** escritório de bairro, clínica, coworking, torre de escritórios, torre espelhada, sede corporativa e centro empresarial (até 4×4).
+- **Marcos:** torre de TV (R$ 6.000, 2×2), catedral (R$ 8.000, 3×3), parque central (R$ 5.000, 4×4) e estádio (R$ 15.000, 4×4). Cada etapa a partir da Cidade pequena libera uma vaga. Visitantes rendem R$ 0,60 cada e gastam no comércio; o marco valoriza o terreno num raio de 6 lotes.
+- **Interface:** barra por categorias (Ver, Obras, Bairros, Produção, Cidade, Marcos) com bandeja de ferramentas, botões grandes com contorno grosso e sombra sólida, mais espaço entre itens. Barras de demanda B M A, C, I, E.
+
 ## Progressão e metas
 
 1. Desenhe uma rua.
@@ -148,14 +158,17 @@ Cadeias: fazenda → fábrica de alimentos → comércio → moradores; indústr
 8. Compre um trator para uma fazenda.
 9. Chegue a 1.000 moradores.
 10. Faça crescer um prédio de alta densidade.
-11. Amplie a prefeitura.
+11. Crie um bairro de escritórios.
+12. Construa seu primeiro marco.
+13. Amplie a prefeitura.
+14. Tenha 100 moradores de classe alta.
 
 ## Roadmap
 
 1. **Feito — Fase 1:** câmera, ruas, pontes, cadeia de comida, metas, save.
 2. **Feito — Bairros:** zonas R/C/I, duas densidades, ícones e fontes.
 3. **Feito — Entrega A:** prédios de 1×1 a 4×4, fazendas pintadas com equipamentos, prefeitura que amplia, 4 etapas.
-4. **Próximo — Entrega B:** classes sociais, escritórios, famílias subindo de classe, marcos e turismo.
+4. **Feito — Entrega B:** classes sociais, escritórios, famílias subindo de classe, marcos e turismo, interface por categorias.
 5. **Depois — Serviços:** energia e água, níveis automáticos de prédio.
 6. **Depois — Cidade viva:** carros e caminhões, armazéns, trânsito.
 7. **Depois — Distritos e decoração.**

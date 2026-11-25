@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Cidade — Protótipo</title>
+<link rel="manifest" href="./city.webmanifest"><meta name="theme-color" content="#508467"><link rel="icon" href="./city-icon.svg">
+<title>City in Bag</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Lilita+One&display=swap" rel="stylesheet">
@@ -152,11 +153,19 @@ body.tray-open #alert{display:none!important}
 #info .pol b{font-family:var(--title);font-weight:400;font-size:15px;display:block}
 #info .pol small{font-size:12px;opacity:.8}
 #info .pol.on{background:#c9ecb5}
+[hidden]{display:none!important}
+#demoOptions,#roadDesign{position:fixed;bottom:calc(var(--bar) + 154px + var(--sab));left:50%;transform:translateX(-50%);z-index:7;padding:6px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:max-content;max-width:95vw;font-size:13px}
+#roadDesign select,#planning select,#mapChoice{font:inherit;max-width:100%;background:#fff8e7;border-radius:6px}
+#roadDesign input[type=range]{width:68px}
+#planning .panel{max-height:87dvh;overflow:auto}
+#planning section>label{display:block;margin:10px 0}
+#planning input[type=range]{display:block;width:100%}
+.lineEditor{padding:8px 0;border-top:1px solid #99795b}.lineEditor small{display:block}.lineEditor button{margin:3px}
 </style>
 <script type="importmap">
 {"imports":{
- "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
- "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+ "three":"./vendor/three/three.js",
+ "three/addons/":"./vendor/three/"
 }}
 </script>
 </head>
@@ -255,18 +264,39 @@ body.tray-open #alert{display:none!important}
 <div id="tip" class="panel"></div>
 <div id="toast" class="panel"></div>
 
+<div id="demoOptions" class="panel" hidden><label>Demolir <select id="demoLayer"><option value="auto">Trecho selecionado</option><option value="0">Solo</option><option value="1">Elevada +1</option><option value="2">Elevada +2</option><option value="-1">Túnel</option></select></label></div>
+<div id="roadDesign" class="panel" hidden>
+<label>Traçado <select id="roadShape"><option value="line">Reta</option><option value="curve">Curva</option><option value="free">Curva de 3 pontos</option><option value="ring">Rotatória</option></select></label>
+<label id="bendField" hidden>Curvatura <input id="bend" type="range" min="-1.6" max="1.6" step=".1" value=".7"></label>
+<label>Altura <select id="roadLevel"><option value="0">Solo</option><option value="1">Elevada +1</option><option value="2">Elevada +2</option><option value="-1">Túnel</option></select></label>
+<label id="rampField" hidden>Rampas <select id="ramps"><option value="both">Duas pontas</option><option value="start">Só no início</option><option value="end">Só no fim</option><option value="none">Sem rampas</option></select></label>
+<label><input id="oneWay" type="checkbox"> Mão única</label>
+</div>
+<div class="modal" id="planning"><div class="panel">
+<h2>Prefeitura</h2>
+<nav class="btns"><button data-page="finance">Finanças</button><button data-page="mobility">Mobilidade</button><button data-page="goals">Objetivos</button></nav>
+<section id="finance">
+<label>Impostos <output id="taxValue"></output><input id="tax" type="range" min="50" max="150" step="5"></label>
+<label>Orçamento de serviços <output id="budgetValue"></output><input id="budget" type="range" min="50" max="150" step="5"></label>
+<label><input type="checkbox" id="imports"> Importar alimento em falta · R$ 2/un.</label>
+<div id="ledger"></div></section>
+<section id="mobility" hidden><label><input type="checkbox" id="heat"> Mostrar fluxo nas vias</label><p>Verde indica folga, amarelo indica uso acima de 55% e vermelho indica sobrecarga. Toque numa via no modo Ver para consultar a viagem principal.</p>
+<div class="btns"><button id="newBus">Linha de ônibus</button><button id="newMetro">Linha de metrô</button></div><div id="lines"></div></section>
+<section id="goals" hidden><label>Vocação econômica <select id="focus"><option value="equilibrio">Diversificada</option><option value="industria">Exportadora</option><option value="turismo">Turística</option></select></label><p id="focusHint"></p><div id="missions"></div></section>
+<div class="btns"><button class="big" id="planClose">Voltar à cidade</button></div></div></div>
+
 <div class="modal" id="menu"><div class="panel">
   <h2><svg class="ico"><use href="#i-city"/></svg>Cidade</h2>
   <p>Protótipo. O jogo salva sozinho neste navegador.</p>
   <div class="btns">
     <button class="big" id="mClose">Continuar</button>
-    <button id="mHelp">Como jogar</button>
+    <button id="planOpen">Gestão da cidade</button><button id="mHelp">Como jogar</button>
     <button id="oSfx">Sons</button>
     <button id="oMus">Música</button>
     <button id="oQ">Gráficos</button>
     <button id="oCopy">Copiar cidade</button>
     <button id="oPaste">Colar cidade</button>
-    <button class="danger" id="mNew">Novo jogo</button>
+    <button id="restore4" hidden>Recuperar cidade da entrega B</button><button id="restore5" hidden>Recuperar cidade da entrega C</button><button class="danger" id="mNew">Novo jogo</button>
   </div>
 </div></div>
 
@@ -281,9 +311,9 @@ body.tray-open #alert{display:none!important}
   <h2><svg class="ico"><use href="#i-city"/></svg>Como jogar</h2>
   <ul>
     <li><svg class="ico"><use href="#i-hand"/></svg><span><b>Câmera:</b> arraste com um dedo no modo Ver, ou com dois dedos em qualquer modo. Pinça para zoom. No PC: WASD, roda do mouse e Q/E para girar.</span></li>
-    <li><svg class="ico"><use href="#i-road"/></svg><span><b>Ruas:</b> arraste para desenhar. Sobre o rio vira ponte. Avenidas aguentam mais trânsito; viadutos passam por cima de ruas, trilhos e rio.</span></li>
+    <li><svg class="ico"><use href="#i-road"/></svg><span><b>Ruas:</b> escolha o traçado e arraste. Na curva de 3 pontos, toque no início, no controle e no fim. Na rotatória, arraste do centro até a borda. Sobre o rio vira ponte. Avenidas aguentam mais trânsito; viadutos passam por cima de ruas, trilhos e rio.</span></li>
     <li><svg class="ico"><use href="#i-power"/></svg><span><b>Serviços:</b> prédios precisam de energia e água (tudo ligado pela rua). Escola, saúde, polícia e bombeiros sobem o nível dos prédios.</span></li>
-    <li><svg class="ico"><use href="#i-train"/></svg><span><b>Transporte:</b> garagem + pontos de ônibus, estações de metrô (ligam sozinhas) e trilhos com duas estações de trem tiram carros da rua.</span></li>
+    <li><svg class="ico"><use href="#i-train"/></svg><span><b>Transporte:</b> garagem + pontos de ônibus, estações de metrô com uma linha definida em Gestão da cidade e trilhos com duas estações de trem tiram carros da rua.</span></li>
     <li><svg class="ico"><use href="#i-district"/></svg><span><b>Distritos:</b> pinte uma área, dê um nome e escolha regras para ela.</span></li>
     <li><svg class="ico"><use href="#i-res"/></svg><span><b>Bairros:</b> pinte zonas <b style="color:#3f8f33">residenciais</b>, <b style="color:#2f6fc0">comerciais</b>, <b style="color:#b98a1e">industriais</b> e <b style="color:#7350c0">escritórios</b> ao lado das ruas. Os prédios surgem sozinhos quando há demanda (barras R C I), em tamanhos de 1×1 até 4×4 conforme o espaço e o valor do terreno.</span></li>
     <li><svg class="ico"><use href="#i-city"/></svg><span><b>Etapas:</b> Vila, Cidade pequena (1.000), Cidade (5.000) e Metrópole (20.000). Cada etapa libera prédios maiores; a alta densidade chega na Cidade pequena.</span></li>
@@ -300,13 +330,13 @@ body.tray-open #alert{display:none!important}
 
 <div class="modal" id="confirmNew"><div class="panel">
   <h2>Começar de novo?</h2>
-  <p>A cidade atual será apagada.</p>
+  <p>A cidade atual será apagada.</p><label>Mapa <select id="mapChoice"><option value="rio">Planície do rio</option><option value="vale">Vale sinuoso</option><option value="ilhas">Arquipélago</option></select></label>
   <div class="btns">
     <button class="danger" id="cYes">Sim, novo jogo</button>
     <button id="cNo">Cancelar</button>
   </div>
 </div></div>
 
-<script type="module" src="./game.js"></script>
+<script type="module" src="./game.js"></script><script>if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(console.warn);</script>
 </body>
 </html>

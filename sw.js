@@ -1,4 +1,4 @@
-const version='city-in-bag-v6-1-'+new URL(self.registration.scope).pathname;
+const version='city-in-bag-v6-2-'+new URL(self.registration.scope).pathname;
 const assets=['./','index.html','game.js','models.js','roads.js','saves.js','city.webmanifest','city-icon.svg','vendor/three/three.js','vendor/three/controls/MapControls.js','vendor/three/controls/OrbitControls.js','vendor/three/utils/BufferGeometryUtils.js'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(version).then(cache=>cache.addAll(assets))));
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));

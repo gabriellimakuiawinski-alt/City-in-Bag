@@ -299,7 +299,9 @@ function heatColor(x,z){
   const i=idx(x,z), flow=Math.max(heat[i],heat[i+N*N],heat[i+2*N*N],heat[i+3*N*N]);
   return flow>1?'#df5841':flow>0.55?'#e4a944':'#5cae89';
 }
+const snapEdges=new Map();
 function indexRoads(){
+  snapEdges.clear();
   engineered.clear(); groundRoads.clear(); islands.clear();singleLots.clear();
   for(const r of S.roads.filter(r=>r.shape==='ring')){
     const radius=clamp(Math.hypot(r.b.x-r.a.x,r.b.z-r.a.z),1.6,5);
@@ -308,6 +310,12 @@ function indexRoads(){
     }
   }
   for(const road of S.roads){
+    const pts=roadSamples(road);
+    for(let j=1;j<pts.length;j++){
+      const p=pts[j],q=pts[j-1],i=idx(Math.round((p.x+q.x)/2),Math.round((p.z+q.z)/2));
+      if(!snapEdges.has(i))snapEdges.set(i,[]);
+      snapEdges.get(i).push([q,p]);
+    }
     if(road.a.x===road.b.x && road.a.z===road.b.z && road.shape!=='ring')singleLots.add(idx(road.a.x,road.a.z));
     for(const n of roadPath(road,N)){
       if(!n.band && islands.has(n.id)) continue;
@@ -316,30 +324,112 @@ function indexRoads(){
     }
   }
 }
-function designRoad(a,b){
+function roadPoint(p){
+  return {x:clamp(p.fx===undefined?p.x:p.fx-0.5,0,N-1),z:clamp(p.fz===undefined?p.z:p.fz-0.5,0,N-1)};
+}
+function snapPoint(p,height){
+  if(!$('#snapRoad').checked) return p;
+  let best=p, distance=0.72;
+  const consider=(x,z)=>{const d=Math.hypot(x-p.x,z-p.z);if(d<distance){distance=d;best={x,z};}};
+  const cx=Math.round(p.x),cz=Math.round(p.z);
+  for(let z=cz-1;z<=cz+1;z++)for(let x=cx-1;x<=cx+1;x++){
+    if(!inb(x,z))continue;
+    const i=idx(x,z);
+    if(!height && isRoad(x,z)&&!groundRoads.has(i))consider(x,z);
+    for(const edge of snapEdges.get(i)||[]){
+      const [a,b]=edge,dx=b.x-a.x,dz=b.z-a.z;
+      const t=clamp(((p.x-a.x)*dx+(p.z-a.z)*dz)/(dx*dx+dz*dz||1),0,1);
+      if(Math.abs(a.h+t*(b.h-a.h)-height)<0.18)consider(a.x+dx*t,a.z+dz*t);
+    }
+  }
+  return best;
+}
+function designRoad(start,end){
   const kind=tool==='avenida'?'avenida':'rua';
-  const road={...roadSettings,kind,a:{x:a.x,z:a.z},b:{x:b.x,z:b.z}};
-  if(road.shape==='free'){road.shape='curve'; road.a=curveClicks[0]||road.a;road.control=curveClicks[1]||road.a;}
-  if(tool==='viaduto') road.level=Math.max(1,road.level);
+  const level=tool==='viaduto'?Math.max(1,roadSettings.level):roadSettings.level;
+  const shape=roadSettings.shape, curved=['free','tangent'].includes(shape);
+  if(shape==='upgrade'){
+    const p=roadPoint(end);
+    let selected=null,nearest=0.82;
+    for(const existing of S.roads){
+      if(existing.level!==level)continue;
+      for(const v of roadSamples(existing)){
+        const d=Math.hypot(v.x-p.x,v.z-p.z);
+        if(d<nearest){nearest=d;selected=existing;}
+      }
+    }
+    if(!selected)return {items:[],err:'Toque numa via desenhada nesta altura',label:'Toque numa via desenhada nesta altura',n:0,cost:0};
+    const road={...selected,kind,one:selected.shape==='ring'||roadSettings.one};
+    if($('#reverseRoad').checked && road.shape!=='ring'){
+      [road.a,road.b]=[road.b,road.a];road.bend=-road.bend;
+      if(road.offset)road.offset=-road.offset;
+      if(road.ramps==='start')road.ramps='end';else if(road.ramps==='end')road.ramps='start';
+    }
+    const cost=kind==='avenida' && selected.kind!=='avenida'?20*roadPath(road,N).length:0;
+    const err=cost>S.money?'Dinheiro insuficiente':'';
+    return {road,replace:selected,items:[],err,cost,label:err||('Substituir · R$ '+fmt(cost))};
+  }
+  const ramps=roadSettings.ramps||'both';
+  let a=curveClicks[0]||snapPoint(roadPoint(start),['both','start'].includes(ramps)?0:level);
+  let b=roadPoint(end);
+  if($('#snapAngle').checked && shape==='line'){
+    const dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz),angle=Math.round(Math.atan2(dz,dx)*12/Math.PI)*Math.PI/12;
+    b={x:clamp(a.x+len*Math.cos(angle),0,N-1),z:clamp(a.z+len*Math.sin(angle),0,N-1)};
+  }
+  b=snapPoint(b,['both','end'].includes(ramps)?0:level);
+  if(shape==='ring')a={x:Math.round(a.x),z:Math.round(a.z)};
+  const road={...roadSettings,level,kind,a,b,shape:curved?'curve':shape};
+  if(curved) road.control=curveClicks[1]||a;
+  if(shape==='tangent' && tangent){
+    const dist=Math.hypot(b.x-a.x,b.z-a.z)*0.5;
+    road.control={x:clamp(a.x+tangent.x*dist,0,N-1),z:clamp(a.z+tangent.z*dist,0,N-1)};
+  }
   if(road.shape==='ring'){road.one=true;road.level=0;}
-  const nodes=roadPath(road,N), length=Math.hypot(b.x-a.x,b.z-a.z);
+  const spacing=+$('#spacingRoad').value;
+  if(shape==='grid'){
+    const endPoint=road.b, corners=curveClicks;
+    const axis=corners[1]||endPoint;
+    const dx=axis.x-a.x,dz=axis.z-a.z,width=Math.hypot(dx,dz);
+    if(width<0.35||corners.length<2)return validateRoad({...road,shape:'line',b:axis});
+    const ux=dx/width,uz=dz/width,depth=(endPoint.x-axis.x)*(-uz)+(endPoint.z-axis.z)*ux;
+    const pos=(w,d)=>({x:a.x+ux*w-uz*d,z:a.z+uz*w+ux*d});
+    const children=[];
+    const add=(p,q)=>children.push({...road,a:p,b:q,shape:'line',level:0,one:false});
+    const nx=Math.max(1,Math.round(width/spacing)),nz=Math.max(1,Math.round(Math.abs(depth)/spacing));
+    for(let j=0;j<=nx;j++)add(pos(width*j/nx,0),pos(width*j/nx,depth));
+    for(let j=0;j<=nz;j++)add(pos(0,depth*j/nz),pos(width,depth*j/nz));
+    return groupRoads(children);
+  }
+  if($('#parallelRoad').checked && shape!=='ring')return groupRoads([road,{...road,offset:spacing}]);
+  return validateRoad(road);
+}
+function groupRoads(roads){
+  const plans=roads.map(validateRoad),first=plans[0],cost=plans.reduce((sum,p)=>sum+p.cost,0);
+  const err=plans.find(p=>p.err)?.err || (cost>S.money?'Dinheiro insuficiente':'');
+  return {...first,roads,cost,err,label:err||('R$ '+fmt(cost)+' · '+roads.length+' vias')};
+}
+function validateRoad(road){
+  const {a,b,kind,shape}=road;
+  const nodes=roadPath(road,N),length=Math.hypot(b.x-a.x,b.z-a.z);
   const cost=nodes.reduce((s,n)=>s+(road.level<0?80:road.level>0?60:isWater(n.x,n.z)?50:kind==='avenida'?30:10),0);
   let err='';
-  if(road.shape==='ring' && Array.from({length:121},(_,j)=>[a.x+j%11-5,a.z+Math.floor(j/11)-5]).some(([x,z])=>inb(x,z)&&Math.hypot(x-a.x,z-a.z)<clamp(length,1.6,5)-0.5 && [T.BUILD,T.FARM,T.RAIL,T.WATER].includes(grid.t[idx(x,z)]))) err='Libere a ilha central da rotatória';
+  if([a,b].some(p=>p.x<0||p.x>N-1||p.z<0||p.z>N-1))err='Traçado fora do mapa';
+  else if(road.shape==='ring' && Array.from({length:121},(_,j)=>[a.x+j%11-5,a.z+Math.floor(j/11)-5]).some(([x,z])=>inb(x,z)&&Math.hypot(x-a.x,z-a.z)<clamp(length,1.6,5)-0.5 && [T.BUILD,T.FARM,T.RAIL,T.WATER].includes(grid.t[idx(x,z)]))) err='Libere a ilha central da rotatória';
   else if(nodes.some(n=>!inb(n.x,n.z))) err='Traçado fora do mapa';
   else if(nodes.some(n=>grid.e[idx(n.x,n.z)] && n.band===1)) err='Já existe um viaduto nessa altura';
   else if(nodes.some(n=>!n.band && ![T.EMPTY,T.TREE,T.WATER,T.BRIDGE,T.ROAD].includes(grid.t[idx(n.x,n.z)]))) err='A entrada ou pista ocupa um lote construído';
   else if(nodes.some(n=>n.band!==2 && grid.b[idx(n.x,n.z)]>=0)) err='Prédio no traçado';
   else if(road.level && road.ramps!=='none' && length<5) err='Arraste pelo menos 5 lotes para as rampas';
+  else if(length<0.35 && shape!=='ring') err='Escolha o fim da via';
   else if(cost>S.money) err='Dinheiro insuficiente';
   const items=nodes.map(n=>[n.x,n.z,err?'bad':'ok']);
-  return {road,items,n:nodes.length,cost,err,label:err||('Via · R$ '+fmt(cost))};
+  return {road,items,n:nodes.length,cost,err,label:err||(length.toFixed(1)+' lotes · '+Math.round(Math.atan2(b.z-a.z,b.x-a.x)*180/Math.PI)+'° · R$ '+fmt(cost))};
 }
 function applyRoad(road){
   // Redrawing the same alignment replaces its class or direction.
   const same=(p,q)=>p?.x===q?.x && p?.z===q?.z;
   S.roads=S.roads.filter(r=>{
-    if(r.shape!==road.shape||r.level!==road.level||!same(r.control,road.control)) return true;
+    if((r.offset||0)!==(road.offset||0)||r.shape!==road.shape||r.level!==road.level||!same(r.control,road.control)) return true;
     const forward=same(r.a,road.a)&&same(r.b,road.b);
     const reverse=r.shape!=='ring'&&same(r.a,road.b)&&same(r.b,road.a);
     return !(forward||reverse) || (r.shape==='curve'&&!r.control&&r.bend!==(forward?road.bend:-road.bend));
@@ -1409,7 +1499,27 @@ function setGhost(type){
   ghost.traverse(o=>{ if (o.isMesh){ o.material = ghostMat; o.castShadow=false; } if (o.isLineSegments) o.visible=false; });
   ghost.visible = false; world.add(ghost);
 }
-function clearPreview(){ pvPool.forEach(m=>m.visible=false); if (ghost) ghost.visible=false; hideTip(); }
+const roadPreview=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial({color:0x45c990,transparent:true,opacity:0.66,depthTest:false,side:THREE.DoubleSide}));
+roadPreview.renderOrder=6;roadPreview.visible=false;world.add(roadPreview);
+function previewRoads(pl){
+  const vertices=[];
+  for(const road of pl.roads||[pl.road]){
+    const pts=roadSamples(road),width=road.kind==='avenida'?0.61:0.415;
+    let prev=null;
+    for(let i=0;i<pts.length;i++){
+      const p=pts[i],a=pts[Math.max(0,i-1)],b=pts[Math.min(i+1,pts.length-1)];
+      const dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz)||1,y=Math.max(0.12,p.h*0.85+0.12);
+      const left=[wx(p.x)-dz/len*width,y,wx(p.z)+dx/len*width],right=[wx(p.x)+dz/len*width,y,wx(p.z)-dx/len*width];
+      if(prev)vertices.push(...prev[0],...left,...right,...prev[0],...right,...prev[1]);
+      prev=[left,right];
+    }
+  }
+  roadPreview.geometry.dispose();
+  roadPreview.geometry=new THREE.BufferGeometry();
+  roadPreview.geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+  roadPreview.material.color.set(pl.err?'#e66151':'#46c693');roadPreview.visible=true;
+}
+function clearPreview(){ roadPreview.visible=false; pvPool.forEach(m=>m.visible=false); if (ghost) ghost.visible=false; hideTip(); }
 function lPath(a, b){
   const r = []; const sx = Math.sign(b.x-a.x), sz = Math.sign(b.z-a.z);
   let x=a.x, z=a.z; r.push([x,z]);
@@ -1509,12 +1619,7 @@ function anchorFor(p){ const w = SPECIAL[tool]?.w || 1; return { ...p, ax:Math.r
 function showPlan(pl, cx, cy){
   clearPreview(); if (!pl) return;
   if(pl.road){
-    const points=roadSamples(pl.road);
-    points.forEach((p,i)=>{
-      const next=points[Math.min(i+1,points.length-1)];
-      pvTile(i,0,0,pl.err?pvBad:pvOk,1,0.04);
-      const m=pvPool[i];m.position.set(wx(p.x),Math.max(0.09,p.h*0.85+0.09),wx(p.z));m.rotation.y=Math.atan2(next.x-p.x,next.z-p.z);m.scale.set(pl.road.kind==='avenida'?1.22:0.83,0.055,Math.max(0.15,Math.hypot(next.x-p.x,next.z-p.z)+0.03));
-    });
+    previewRoads(pl);
   }else if (pl.building){
     const w = SPECIAL[tool].w;
     pvTile(0, pl.ax, pl.az, pl.ok?pvOk:pvBad, w, 0.06);
@@ -1525,7 +1630,8 @@ function showPlan(pl, cx, cy){
   showTip(pl.label, cx, cy, pl.building ? !pl.ok : (!!pl.err || pl.cost > S.money));
 }
 function commit(pl){
-  if(pl?.road){if(pl.err){toast(pl.err);return;} applyRoad(pl.road);S.money-=pl.cost;sfx('road');afterChange();return;}
+  if(pl?.err&&!pl.road&&roadSettings.shape==='upgrade'&&['rua','avenida','viaduto'].includes(tool)){toast(pl.err);return;}
+  if(pl?.road){if(pl.err){toast(pl.err);return;} if(pl.replace) S.roads.splice(S.roads.indexOf(pl.replace),1);for(const road of pl.roads||[pl.road])applyRoad(road);S.money-=pl.cost;sfx('road');afterChange();return;}
   if (!pl) return;
   if (pl.building){
     if (!pl.ok){ toast(pl.err, 'warn'); return; }
@@ -1613,6 +1719,8 @@ function afterChange(){ checkGoals(); updateHUD(); save(); }
 const pointers = new Map();
 let drag = null, tapCand = null;
 canvas.addEventListener('pointerdown', e=>{
+  document.body.classList.remove('adjusting','summary');
+  $('#adjustTool').setAttribute('aria-expanded','false');$('#summaryBtn').setAttribute('aria-expanded','false');
   pointers.set(e.pointerId, 1);
   if (pointers.size > 1){ drag=null; tapCand=null; clearPreview(); return; }
   if (e.pointerType==='mouse' && e.button!==0) return;
@@ -1636,9 +1744,22 @@ addEventListener('pointerup', e=>{
   pointers.delete(e.pointerId);
   if (drag && drag.id===e.pointerId){
     const pl = plan(drag.a, drag.b);
-    if(pl?.road && roadSettings.shape==='free' && curveClicks.length<2){
-      curveClicks.push({x:drag.b.x,z:drag.b.z});toast(curveClicks.length===1?'Toque no controle da curva':'Toque no fim da curva');
-    }else{commit(pl);curveClicks=[];}
+    if(pl?.road){
+      const shape=roadSettings.shape, tap=Math.hypot(drag.a.fx-drag.b.fx,drag.a.fz-drag.b.fz)<0.3;
+      if(shape==='upgrade'){commit(pl);resetStroke();}
+      else if(!curveClicks.length && (tap||['free','tangent','grid'].includes(shape))){
+        curveClicks.push(pl.road.a);toast(shape==='grid'?'Toque para definir a largura':['free','tangent'].includes(shape)?'Toque na direção inicial':'Toque no fim do trecho');
+      }else if(['free','tangent','grid'].includes(shape) && curveClicks.length===1 && !tangent){
+        curveClicks.push(roadPoint(drag.b));toast(shape==='grid'?'Toque para definir a profundidade':'Toque no fim da curva');
+      }else if(!pl.err){
+        commit(pl);
+        curveClicks=['ring','grid'].includes(shape)?[]:[pl.road.b];tangent=null;
+        if(shape==='tangent'){
+          const dx=pl.road.b.x-pl.road.control.x,dz=pl.road.b.z-pl.road.control.z,len=Math.hypot(dx,dz);
+          if(len>0.01)tangent={x:dx/len,z:dz/len};
+        }
+      }else toast(pl.err);
+    }else commit(pl);
     drag=null;
     if (e.pointerType==='mouse'){ const p=pick3(e.clientX,e.clientY); if (p){ const a=anchorFor(p); showPlan(plan(a,a), e.clientX, e.clientY); } }
     else clearPreview();
@@ -1835,9 +1956,16 @@ function markTools(){
   document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('on', b.dataset.tool===tool));
 }
 function selectTool(id){
-  curveClicks=[];
+  resetStroke();
+  document.body.classList.remove('summary','adjusting');
+  $('#summaryBtn').setAttribute('aria-expanded','false');
+  $('#adjustTool').setAttribute('aria-expanded','false');
   if (tool===id && id!=='ver') id = 'ver';
-  tool = id; drag = null; clearPreview();
+  tool = id;
+  document.body.classList.toggle('working',id!=='ver');
+  $('#activeName').textContent=curTool().nome;
+  $('#adjustTool').hidden=!['rua','avenida','viaduto'].includes(id);
+  drag = null; clearPreview();
   if (id==='ver'){ cat = null; renderTray(); }
   markTools(); viewHooks();
   gridLines.visible = id!=='ver';
@@ -1860,7 +1988,7 @@ document.querySelectorAll('#dens button').forEach(b=> b.onclick = ()=>{
   zoneDens = d; updateDens();
 });
 document.querySelectorAll('[data-sp]').forEach(b=> b.onclick = ()=>setSpeed(+b.dataset.sp));
-function setSpeed(s){ S.speed = s; document.querySelectorAll('[data-sp]').forEach(b=>b.classList.toggle('on', +b.dataset.sp===s)); }
+function setSpeed(s){ S.speed = s; $('#speedBtn').textContent=s?s+'×':'Ⅱ'; document.querySelectorAll('[data-sp]').forEach(b=>b.classList.toggle('on', +b.dataset.sp===s)); }
 
 let toastT;
 function toast(msg, ic='warn'){ const t=$('#toast'); t.innerHTML = ico(ic)+msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'), 2100); }
@@ -2060,9 +2188,20 @@ $('#imports').onchange=e=>{S.imports=e.target.checked;save();};
 $('#focus').onchange=e=>{S.focus=e.target.value;save();refreshPlanning();};
 $('#heat').onchange=e=>{heatVisible=e.target.checked;rebuildRoads(false);};
 for(const [id,type] of [['newBus','bus'],['newMetro','metro']]) $('#'+id).onclick=()=>{S.lines.push({type,stops:[]});saveLines();};
-let curveClicks=[];
-$('#roadShape').onchange=e=>{roadSettings.shape=e.target.value;curveClicks=[];$('#bendField').hidden=e.target.value!=='curve';if(e.target.value==='free')toast('Toque no início, na direção da curva e no fim');};
-$('#roadLevel').onchange=e=>{roadSettings.level=+e.target.value;$('#rampField').hidden=!roadSettings.level;};
+let curveClicks=[],tangent=null;
+function resetStroke(){curveClicks=[];tangent=null;clearPreview();}
+function backStep(){if(tangent){resetStroke();return;}curveClicks.pop();clearPreview();}
+canvas.addEventListener('contextmenu',e=>{if(['rua','avenida','viaduto'].includes(tool)){e.preventDefault();backStep();}});
+$('#restartRoad').onclick=()=>{resetStroke();document.body.classList.remove('adjusting');toast('Toque no início da nova via');};
+$('#summaryBtn').onclick=e=>e.currentTarget.setAttribute('aria-expanded',document.body.classList.toggle('summary'));
+$('#speedBtn').onclick=()=>setSpeed(S.speed===0?1:S.speed===1?3:0);
+$('#finishTool').onclick=()=>selectTool('ver');
+$('#changeTool').onclick=()=>{const id=curTool().cat;selectTool('ver');openCat(id);};
+$('#adjustTool').onclick=e=>e.currentTarget.setAttribute('aria-expanded',document.body.classList.toggle('adjusting'));
+
+$('#parallelRoad').onchange=()=>$('#spaceRoad').hidden=!$('#parallelRoad').checked && roadSettings.shape!=='grid';
+$('#roadShape').onchange=e=>{$('#reverseField').hidden=e.target.value!=='upgrade';$('#spaceRoad').hidden=e.target.value!=='grid' && !$('#parallelRoad').checked;roadSettings.shape=e.target.value;resetStroke();$('#bendField').hidden=e.target.value!=='curve';if(e.target.value==='free')toast('Toque no início, na direção da curva e no fim');};
+$('#roadLevel').onchange=e=>{resetStroke();roadSettings.level=+e.target.value;$('#rampField').hidden=!roadSettings.level;};
 $('#ramps').onchange=e=>roadSettings.ramps=e.target.value;
 $('#oneWay').onchange=e=>roadSettings.one=e.target.checked;
 $('#bend').oninput=e=>roadSettings.bend=+e.target.value;

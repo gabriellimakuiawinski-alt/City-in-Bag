@@ -26,9 +26,9 @@ export function decodeCity(raw, size, special, models) {
     for(let z=b.gz;z<b.gz+b.gd;z++)for(let x=b.gx;x<b.gx+b.gw;x++)occupy(z*size+x);
   }
   for(const f of city.f){require(integer(f.level,1,3)&&Array.isArray(f.tiles)&&f.tiles.length);f.tiles.forEach(occupy);}
-  const point=p=>p&&integer(p.x,0,size-1)&&integer(p.z,0,size-1);
+  const point=p=>p&&[p.x,p.z].every(v=>Number.isFinite(v)&&v>=0&&v<=size-1);
   require(Array.isArray(s.roads??[]) && (s.roads??[]).length<=area*4);
-  for(const r of s.roads??[]) require(point(r.a)&&point(r.b)&&['line','curve','ring'].includes(r.shape)&&['rua','avenida'].includes(r.kind)&&[-1,0,1,2].includes(r.level)&&Math.abs(r.bend)<=2&&typeof r.one==='boolean'&&(!r.control||point(r.control))&&(!r.ramps||['both','start','end','none'].includes(r.ramps)));
+  for(const r of s.roads??[]) require((r.offset===undefined||[2,4,6].includes(Math.abs(r.offset)))&&point(r.a)&&point(r.b)&&['line','curve','ring'].includes(r.shape)&&['rua','avenida'].includes(r.kind)&&[-1,0,1,2].includes(r.level)&&Math.abs(r.bend)<=2&&typeof r.one==='boolean'&&(!r.control||point(r.control))&&(!r.ramps||['both','start','end','none'].includes(r.ramps)));
   require(Object.entries(s.roadBase??{}).every(([i,t])=>integer(+i,0,area-1)&&Array.isArray(t)&&integer(t[0],0,9)&&integer(t[1],0,2)));
   require((s.lines??[]).every(l=>['bus','metro'].includes(l.type)&&Array.isArray(l.stops)&&l.stops.every(Number.isSafeInteger)));
   for(const k of ['tax','budget']) if(k in s) require(integer(s[k],50,150));

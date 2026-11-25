@@ -300,7 +300,13 @@ function heatColor(x,z){
   return flow>1?'#df5841':flow>0.55?'#e4a944':'#5cae89';
 }
 const snapEdges=new Map();
+const joins=[];
+function legacyRoad(i){
+  const t=S.roadBase[i]?.[0]??(!groundRoads.has(i)?grid.t[i]:T.EMPTY);
+  return t===T.ROAD || t===T.BRIDGE;
+}
 function indexRoads(){
+  joins.length=0;
   snapEdges.clear();
   engineered.clear(); groundRoads.clear(); islands.clear();singleLots.clear();
   for(const r of S.roads.filter(r=>r.shape==='ring')){
@@ -314,7 +320,7 @@ function indexRoads(){
     for(let j=1;j<pts.length;j++){
       const p=pts[j],q=pts[j-1],i=idx(Math.round((p.x+q.x)/2),Math.round((p.z+q.z)/2));
       if(!snapEdges.has(i))snapEdges.set(i,[]);
-      snapEdges.get(i).push([q,p]);
+      snapEdges.get(i).push([q,p,road,j===1,j===pts.length-1]);
     }
     if(road.a.x===road.b.x && road.a.z===road.b.z && road.shape!=='ring')singleLots.add(idx(road.a.x,road.a.z));
     for(const n of roadPath(road,N)){
@@ -323,19 +329,57 @@ function indexRoads(){
       if(!n.band) groundRoads.add(n.id);
     }
   }
+  for(const road of S.roads){
+    if(road.shape==='ring')continue;
+    const pts=roadSamples(road),last=pts.length-1;
+    for(const [j,near] of [[0,1],[last,last-1]]){
+      const tip=pts[j],prev=pts[near],cx=Math.round(tip.x),cz=Math.round(tip.z);
+      const dx=tip.x-prev.x,dz=tip.z-prev.z,len=Math.hypot(dx,dz);
+      let nearest=null,limit=1.18,targetStart=false,targetEnd=false;
+      const consider=(x,z,h,start=false,end=false)=>{
+        const vx=x-tip.x,vz=z-tip.z,d=Math.hypot(vx,vz);
+        if(d>=limit||Math.abs(h-tip.h)>0.15)return;
+        if(d>0.18 && len && (vx*dx+vz*dz)<d*len*0.45)return;
+        if(d>0.18 && Math.abs(h)<0.24){
+          for(const t of [0.25,0.5,0.75]){
+            const i=idx(Math.round(tip.x+vx*t),Math.round(tip.z+vz*t));
+            if(islands.has(i)||[T.RAIL,T.RAILBR,T.BUILD,T.FARM,T.ROCK,T.WATER].includes(grid.t[i]))return;
+          }
+        }
+        nearest={x,z,h};limit=d;targetStart=start;targetEnd=end;
+      };
+      for(let z=cz-2;z<=cz+2;z++)for(let x=cx-2;x<=cx+2;x++){
+        if(!inb(x,z))continue;
+        const i=idx(x,z);
+        if(islands.has(i))continue;
+        if(legacyRoad(i))consider(x,z,0);
+        for(const [a,b,owner,first,final] of snapEdges.get(i)||[]){
+          if(owner===road)continue;
+          const ex=b.x-a.x,ez=b.z-a.z,t=clamp(((tip.x-a.x)*ex+(tip.z-a.z)*ez)/(ex*ex+ez*ez||1),0,1);
+          consider(a.x+t*ex,a.z+t*ez,a.h+t*(b.h-a.h),owner.one&&first&&t<0.001,owner.one&&final&&t>0.999);
+        }
+      }
+      if(nearest){
+        const band=h=>Math.abs(h)<0.24?0:h<0?2:h>1.35?3:1;
+        const id=p=>idx(Math.round(p.x),Math.round(p.z))+band(p.h)*N*N;
+        const a=tip,b=nearest;
+        joins.push({a,b,from:id(a),to:id(b),out:(!road.one||j===last)&&!targetEnd,back:(!road.one||j===0)&&!targetStart,width:road.kind==='avenida'?1.22:0.83});
+      }
+    }
+  }
 }
 function roadPoint(p){
   return {x:clamp(p.fx===undefined?p.x:p.fx-0.5,0,N-1),z:clamp(p.fz===undefined?p.z:p.fz-0.5,0,N-1)};
 }
 function snapPoint(p,height){
   if(!$('#snapRoad').checked) return p;
-  let best=p, distance=0.72;
+  let best=p, distance=1.12;
   const consider=(x,z)=>{const d=Math.hypot(x-p.x,z-p.z);if(d<distance){distance=d;best={x,z};}};
   const cx=Math.round(p.x),cz=Math.round(p.z);
   for(let z=cz-1;z<=cz+1;z++)for(let x=cx-1;x<=cx+1;x++){
     if(!inb(x,z))continue;
     const i=idx(x,z);
-    if(!height && isRoad(x,z)&&!groundRoads.has(i))consider(x,z);
+    if(!height && legacyRoad(i) && !islands.has(i))consider(x,z);
     for(const edge of snapEdges.get(i)||[]){
       const [a,b]=edge,dx=b.x-a.x,dz=b.z-a.z;
       const t=clamp(((p.x-a.x)*dx+(p.z-a.z)*dz)/(dx*dx+dz*dz||1),0,1);
@@ -486,7 +530,7 @@ function rebuildRoads(updateGraph=true){
   for (let z=0;z<N;z++) for (let x=0;x<N;x++){
     const i = idx(x,z), t = grid.t[i], e = grid.e[i], X=wx(x), Zc=wx(z);
     // ---------- rua / avenida / ponte ----------
-    if (!islands.has(i) && !groundRoads.has(i) && (t===T.ROAD || t===T.BRIDGE)){
+    if (!islands.has(i) && legacyRoad(i) && (t===T.ROAD || t===T.BRIDGE)){
       const n={ e:isRoad(x+1,z), w:isRoad(x-1,z), s:isRoad(x,z+1), nn:isRoad(x,z-1) };
       if (t===T.BRIDGE){
         k.add(box(1,0.08,1), '#9b7650', X,0.06,Zc, { edges:false });
@@ -550,6 +594,13 @@ function rebuildRoads(updateGraph=true){
     }
   }
   for(const road of S.roads) addRoadMesh(k,road,box,wx,isWater,heatColor,(x,z)=>islands.has(idx(x,z)));
+  for(const {a,b,width} of joins){
+    const dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz);
+    const deck=p=>0.058+p.h*0.85+(isWater(Math.round(p.x),Math.round(p.z))?0.065:0);
+    const ya=deck(a),yb=deck(b),color=heatColor(Math.round(a.x),Math.round(a.z))||'#666972';
+    if(length>0.02)k.add(box(width,0.065,Math.hypot(length,yb-ya)+0.04),color,wx((a.x+b.x)/2),(ya+yb)/2,wx((a.z+b.z)/2),{ry:Math.atan2(dx,dz),rx:-Math.atan2(yb-ya,length),edges:false});
+    for(const p of [a,b])k.add(cyl(width/2,width/2,0.064,16),color,wx(p.x),deck(p)+0.002,wx(p.z),{edges:false});
+  }
   roadObj = swap(roadObj, kitObject(k, { shadow:false }));
   if(updateGraph) buildGraphs();
 }
@@ -565,7 +616,7 @@ function buildGraphs(){
     const i = idx(x,z);
     for (const [,dx,dz] of DIRS){
       const nx=x+dx, nz=z+dz; if (!inb(nx,nz)) continue; const j = idx(nx,nz);
-      if (isRoad(x,z) && isRoad(nx,nz) && !(groundRoads.has(i) && groundRoads.has(j) && !(isSingle(i)||isSingle(j)))) add(G.road, node(i,0), node(j,0));
+      if (isRoad(x,z) && isRoad(nx,nz) && (legacyRoad(i)&&legacyRoad(j) || !(groundRoads.has(i) && groundRoads.has(j)) || isSingle(i)||isSingle(j))) add(G.road, node(i,0), node(j,0));
       if (grid.e[i]===1 && grid.e[j]===1) add(G.road, node(i,1), node(j,1));
       if (grid.e[i]===3 && grid.e[j]===1){ add(G.road, node(i,0), node(j,1)); add(G.road, node(j,1), node(i,0)); }
       if (isRail(x,z) && isRail(nx,nz)) add(G.rail, node(i,0), node(j,0));
@@ -575,6 +626,11 @@ function buildGraphs(){
   }
   // componentes da rede de ruas (para energia e água)
   extendGraph(add);
+  for(const j of joins){
+    if(j.from===j.to)continue;
+    if(j.out)add(G.road,j.from,j.to);
+    if(j.back)add(G.road,j.to,j.from);
+  }
   const physical=new Map();
   for(const [a,edges] of G.road) for(const b of edges){add(physical,a,b);add(physical,b,a);}
   G.comp.fill(-1); let c = 0;

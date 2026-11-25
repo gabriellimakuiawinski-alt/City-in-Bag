@@ -42,7 +42,10 @@ O protótipo roda no navegador com Three.js, o que permite testar no celular e n
 - Grade de 48×48 lotes com rio, bosques e uma estrada de entrada.
 - **Ruas:** arrastar desenha em L, R$ 10 por trecho. **Pontes:** sobre o rio, R$ 50 por trecho.
 - **Árvores:** R$ 10. **Demolir:** retângulo que remove prédios, ruas, fazendas, árvores e zonas.
-- **Em aberto:** relevo, ruas curvas livres, tipos de rua.
+- **Avenidas:** R$ 30, canteiro com árvores, aguentam mais trânsito.
+- **Viadutos:** R$ 60 por trecho, passam por cima de ruas, trilhos e rio, com rampas nas pontas.
+- **Trilhos:** R$ 25 (ponte de trilho R$ 70). Trilho não cruza rua no chão: usa viaduto de trem (R$ 80).
+- **Em aberto:** relevo, ruas curvas livres.
 
 ## Bairros
 
@@ -146,6 +149,35 @@ Cadeias: fazenda → fábrica de alimentos → comércio → moradores; indústr
 - **Marcos:** torre de TV (R$ 6.000, 2×2), catedral (R$ 8.000, 3×3), parque central (R$ 5.000, 4×4) e estádio (R$ 15.000, 4×4). Cada etapa a partir da Cidade pequena libera uma vaga. Visitantes rendem R$ 0,60 cada e gastam no comércio; o marco valoriza o terreno num raio de 6 lotes.
 - **Interface:** barra por categorias (Ver, Obras, Bairros, Produção, Cidade, Marcos) com bandeja de ferramentas, botões grandes com contorno grosso e sombra sólida, mais espaço entre itens. Barras de demanda B M A, C, I, E.
 
+## Serviços (Entrega C, feita)
+
+- **Energia:** turbina eólica (14 MW), usina a carvão (80 MW, polui), solar (45 MW, Cidade pequena), nuclear (320 MW, Metrópole).
+- **Água:** caixa d'água (16 m³), bomba no rio (90 m³, precisa ficar perto da água), estação de tratamento (300 m³, Cidade).
+- Energia e água chegam pela rede de ruas: cada malha conectada tem seu próprio balanço. Até 60 moradores tudo funciona de graça.
+- Prédio sem energia ou água mostra um ícone, rende metade e não cresce.
+- **Escola, universidade, posto de saúde, hospital, polícia, bombeiros:** cobrem um raio. Prédios sobem para o nível 2 com 1 serviço e terreno bom, e para o nível 3 com 3 serviços.
+- **Armazém:** +400 de estoque.
+
+## Transporte (Entrega C, feita)
+
+- **Ônibus:** garagem (4 ônibus) e pontos com raio 4.
+- **Metrô:** estações (Cidade pequena) se ligam sozinhas; com 2 ou mais a rede funciona. Linhas aparecem ao abrir a categoria Linhas.
+- **Trem:** trilhos e estações encostadas no trilho; duas estações ligadas geram uma linha com trem animado.
+- **Aeroporto 5×5:** Metrópole, traz turistas e polui.
+- Transporte público tira carros da rua. Trânsito = viagens ÷ capacidade das vias; acima de 100% deixa os moradores bravos e as lojas mais lentas.
+- Carros, caminhões e ônibus andam pelas ruas, pontes e viadutos (até 90 no gráfico bonito, 36 no leve).
+
+## Distritos e decoração (Entrega C, feita)
+
+- Pinte uma área para criar um distrito; toque nele para trocar o nome e escolher regras: bairro verde, imposto reduzido, incentivo comercial e sem caminhões.
+- Decoração: bancos, poste, canteiro, estátua e chafariz valorizam o entorno, sem precisar de rua.
+
+## Som e opções (Entrega C, feita)
+
+- Efeitos sonoros e música gerados pelo navegador (sem arquivos), com botão para ligar e desligar.
+- Gráficos bonitos ou leves (sem sombras, menos carros).
+- Copiar e colar cidade como código para levar a outro aparelho.
+
 ## Progressão e metas
 
 1. Desenhe uma rua.
@@ -169,10 +201,8 @@ Cadeias: fazenda → fábrica de alimentos → comércio → moradores; indústr
 2. **Feito — Bairros:** zonas R/C/I, duas densidades, ícones e fontes.
 3. **Feito — Entrega A:** prédios de 1×1 a 4×4, fazendas pintadas com equipamentos, prefeitura que amplia, 4 etapas.
 4. **Feito — Entrega B:** classes sociais, escritórios, famílias subindo de classe, marcos e turismo, interface por categorias.
-5. **Depois — Serviços:** energia e água, níveis automáticos de prédio.
-6. **Depois — Cidade viva:** carros e caminhões, armazéns, trânsito.
-7. **Depois — Distritos e decoração.**
-8. **Final:** sons, música, otimização, testes e empacotamento.
+5. **Feito — Entrega C:** energia e água, serviços e níveis de prédio, carros/caminhões/ônibus, trânsito, avenidas, viadutos, trem, metrô, aeroporto, distritos, decoração, sons, música, opções, ~94 modelos de prédio.
+6. **Próximo:** balanceamento fino com partidas longas, ciclo dia/noite, empacotamento para celular (PWA).
 
 ### Decisões em aberto
 

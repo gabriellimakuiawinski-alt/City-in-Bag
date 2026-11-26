@@ -45,7 +45,7 @@ O protótipo roda no navegador com Three.js, o que permite testar no celular e n
 - **Avenidas:** R$ 30, canteiro com árvores, aguentam mais trânsito.
 - **Viadutos:** R$ 60 por trecho, passam por cima de ruas, trilhos e rio, com rampas nas pontas.
 - **Trilhos:** R$ 25 (ponte de trilho R$ 70). Trilho não cruza rua no chão: usa viaduto de trem (R$ 80).
-- **Em aberto:** relevo, ruas curvas livres.
+- A atualização de planejamento acrescenta curvas de três pontos, mão única, rotatórias, túneis e duas alturas de viaduto. O relevo contínuo permanece em estudo.
 
 ## Bairros
 
@@ -202,7 +202,12 @@ Cadeias: fazenda → fábrica de alimentos → comércio → moradores; indústr
 3. **Feito — Entrega A:** prédios de 1×1 a 4×4, fazendas pintadas com equipamentos, prefeitura que amplia, 4 etapas.
 4. **Feito — Entrega B:** classes sociais, escritórios, famílias subindo de classe, marcos e turismo, interface por categorias.
 5. **Feito — Entrega C:** energia e água, serviços e níveis de prédio, carros/caminhões/ônibus, trânsito, avenidas, viadutos, trem, metrô, aeroporto, distritos, decoração, sons, música, opções, ~94 modelos de prédio.
-6. **Próximo:** balanceamento fino com partidas longas, ciclo dia/noite, empacotamento para celular (PWA).
+6. **Implementado — Planejamento e vias.** Finanças, cadeias de madeira e importação de alimento, três mapas, vocações, desafios municipais, iluminação cíclica e suporte offline por service worker. As linhas de ônibus e metrô agora seguem a ordem de paradas definida pelo jogador.
+7. **Validação de longo prazo.** Acompanhar desempenho em aparelhos físicos, progressão até 20 mil moradores e equilíbrio entre as vocações.
+
+O desenho de vias usa amostras contínuas para a malha visual e um grafo dirigido com encaixe por lote e camada para o trânsito. Água e energia percorrem a conexão física nos dois sentidos. Os valores de impostos base atuais por morador são R$ 0,24, R$ 0,38 e R$ 0,65 para as três classes. O painel financeiro aplica a alíquota selecionada e apresenta o fechamento do dia.
+
+Referência de desenho e elevação de vias da Colossal Order. [Development Diary 1 — Road Tools](https://colossalorder.fi/news/development-diary-1-road-tools/)
 
 ### Decisões em aberto
 

@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Cidade — Protótipo</title>
+<link rel="manifest" href="./city.webmanifest"><meta name="theme-color" content="#508467"><link rel="icon" href="./city-icon.svg">
+<title>City in Bag</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Lilita+One&display=swap" rel="stylesheet">
@@ -152,11 +153,53 @@ body.tray-open #alert{display:none!important}
 #info .pol b{font-family:var(--title);font-weight:400;font-size:15px;display:block}
 #info .pol small{font-size:12px;opacity:.8}
 #info .pol.on{background:#c9ecb5}
+[hidden]{display:none!important}
+#demoOptions,#roadDesign{position:fixed;bottom:calc(var(--bar) + 154px + var(--sab));left:50%;transform:translateX(-50%);z-index:7;padding:6px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:max-content;max-width:95vw;font-size:13px}
+#roadDesign select,#planning select,#mapChoice{font:inherit;max-width:100%;background:#fff8e7;border-radius:6px}
+#roadDesign input[type=range]{width:68px}
+#planning .panel{max-height:87dvh;overflow:auto}
+#planning section>label{display:block;margin:10px 0}
+#planning input[type=range]{display:block;width:100%}
+.lineEditor{padding:8px 0;border-top:1px solid #99795b}.lineEditor small{display:block}.lineEditor button{margin:3px}
+
+.mobileOnly{display:none}
+@media(max-width:760px),(max-height:530px) and (pointer:coarse){
+ :root{--dockH:54px}
+ .mobileOnly{display:inline-flex}
+ #hud{top:calc(var(--sat) + 6px);left:calc(var(--sal) + 6px);right:calc(var(--sar) + 6px);align-items:center;gap:4px;padding:2px 4px;border-radius:13px;background:#202e2aea;color:#fff;box-shadow:0 2px 8px #13292330}
+ #stats{flex-wrap:nowrap;gap:2px;min-width:0;overflow:hidden}
+ #stats .chip{border:0;background:none;color:inherit;box-shadow:none;padding:2px;font:700 13px system-ui;gap:3px}
+ #stats .chip .ib{width:18px;height:18px;background:none;border:0}
+ #stats .chip small,#stats .chip:nth-child(n+3),#ctrl [data-sp]{display:none}
+ #ctrl{gap:1px} #ctrl button{width:auto;min-width:40px;height:42px;align-items:center;justify-content:center;border:0;box-shadow:none;background:transparent;color:white;border-radius:8px;font:600 13px system-ui}
+ #ctrl button .ico{width:18px;height:18px}
+ #goal,#rci{display:none} body.summary #goal,body.summary #rci{display:block}
+ body.summary #hud{align-items:flex-start}body.summary #stats{flex-wrap:wrap}body.summary #stats .chip:nth-child(n+3){display:flex}
+ body.summary #rci{top:auto;bottom:calc(var(--sab) + 142px);right:8px}
+ #toolbar,#activeDock{box-sizing:border-box;left:calc(var(--sal) + 6px);right:calc(var(--sar) + 6px);bottom:calc(var(--sab) + 6px);padding:4px;gap:3px;background:#fffaf0f7;border:1px solid #968b7970;border-radius:16px;box-shadow:0 3px 10px #2b302638}
+ #toolbar .cat{border:0;box-shadow:none;outline:none;transform:none;width:54px;height:46px;border-radius:11px;background:transparent;font:650 10px system-ui;letter-spacing:0}
+ #toolbar .cat.on,.tool.on{background:#ffe1a1}
+ #toolbar .cat .ico{width:20px;height:20px}
+ #tray{bottom:calc(var(--sab) + 64px);left:6px;right:6px;border:1px solid #968b7970;box-shadow:0 2px 6px #26392a24;border-radius:14px;padding:5px;background:#fffaf0}
+ #tray .trayHead{display:none}#tray .trayItems{padding:0;gap:3px}
+ #tray .tool{height:48px;width:auto;min-width:64px;padding:4px 7px;border:0;box-shadow:none;transform:none;border-radius:9px}
+ #tray .tool .ib{border:0;background:none;width:20px;height:20px;margin:0}#tray .tool .ib .ico{width:18px;height:18px}#tray .nm{min-height:0;font:650 11px system-ui}#tray .c{display:none}
+ #activeDock{display:none;position:fixed;z-index:8;align-items:center;justify-content:space-between}
+ body.working #activeDock{display:flex}body.working #tray,body.working #toolbar{display:none!important}
+ #activeDock button,#roadActions button{border:0;border-radius:10px;background:#f0e9da;padding:0 10px;min-height:44px;font:650 13px system-ui}
+ #activeDock #finishTool{background:#224d44;color:white}
+ #activeDock strong{flex:1;font:700 14px system-ui;padding-left:5px}
+ #roadDesign,#demoOptions,#dens{bottom:calc(var(--sab) + 66px);border:1px solid #b9b1a1;border-radius:13px;box-shadow:0 2px 7px #29362a24;padding:9px;background:#fffaf0}
+ #roadDesign{width:min(350px,94vw);max-height:42dvh;overflow:auto}#roadDesign label{font:600 12px system-ui}#roadDesign select{min-height:36px}
+ body:not(.adjusting) #roadDesign{display:none}
+ #alert{max-width:66vw;pointer-events:none}#rot{bottom:calc(var(--sab) + 126px)}
+ #info{max-height:53dvh;overflow:auto}
+}
 </style>
 <script type="importmap">
 {"imports":{
- "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
- "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+ "three":"./vendor/three/three.js",
+ "three/addons/":"./vendor/three/"
 }}
 </script>
 </head>
@@ -232,7 +275,7 @@ body.tray-open #alert{display:none!important}
 <div id="hud">
   <div id="stats"></div>
   <div id="ctrl">
-    <button class="sq panel press" data-sp="0" title="Pausar"><svg class="ico"><use href="#i-pause"/></svg></button>
+    <button id="summaryBtn" class="mobileOnly" aria-expanded="false">Cidade</button><button id="speedBtn" class="mobileOnly" title="Mudar velocidade">1×</button><button class="sq panel press" data-sp="0" title="Pausar"><svg class="ico"><use href="#i-pause"/></svg></button>
     <button class="sq panel on" data-sp="1" title="Normal"><svg class="ico"><use href="#i-play"/></svg></button>
     <button class="sq panel press" data-sp="3" title="Rápido"><svg class="ico"><use href="#i-fast"/></svg></button>
     <button class="sq panel press" id="menuBtn" title="Menu"><svg class="ico"><use href="#i-menu"/></svg></button>
@@ -251,22 +294,43 @@ body.tray-open #alert{display:none!important}
   <button data-d="1"><svg class="ico"><use href="#i-high"/></svg>Alta densidade</button>
 </div>
 <div id="tray"></div>
-<div id="toolbar"></div>
+<div id="activeDock" class="mobileOnly"><strong id="activeName"></strong><button id="changeTool">Trocar</button><button id="adjustTool" aria-expanded="false">Ajustes</button><button id="finishTool">Concluir</button></div><div id="toolbar"></div>
 <div id="tip" class="panel"></div>
 <div id="toast" class="panel"></div>
+
+<div id="demoOptions" class="panel" hidden><label>Demolir <select id="demoLayer"><option value="auto">Trecho selecionado</option><option value="0">Solo</option><option value="1">Elevada +1</option><option value="2">Elevada +2</option><option value="-1">Túnel</option></select></label></div>
+<div id="roadDesign" class="panel" hidden>
+<label>Traçado <select id="roadShape"><option value="line">Reta</option><option value="curve">Curva</option><option value="free">Curva de 3 pontos</option><option value="tangent">Curva contínua</option><option value="upgrade">Substituir trecho</option><option value="grid">Quadras</option><option value="ring">Rotatória</option></select></label>
+<label id="bendField" hidden>Curvatura <input id="bend" type="range" min="-1.6" max="1.6" step=".1" value=".7"></label>
+<label>Altura <select id="roadLevel"><option value="0">Solo</option><option value="1">Elevada +1</option><option value="2">Elevada +2</option><option value="-1">Túnel</option></select></label>
+<label id="rampField" hidden>Rampas <select id="ramps"><option value="both">Duas pontas</option><option value="start">Só no início</option><option value="end">Só no fim</option><option value="none">Sem rampas</option></select></label>
+<label><input id="parallelRoad" type="checkbox"> Par de vias</label><label id="reverseField" hidden><input id="reverseRoad" type="checkbox"> Inverter sentido</label><label id="spaceRoad" hidden>Espaçamento <select id="spacingRoad"><option value="2">2 lotes</option><option value="4" selected>4 lotes</option><option value="6">6 lotes</option></select></label><label><input id="snapRoad" type="checkbox" checked> Encaixar na via</label><label><input id="snapAngle" type="checkbox"> Ângulos de 15°</label><div id="roadActions"><button type="button" id="restartRoad">Novo início</button></div><label><input id="oneWay" type="checkbox"> Mão única</label>
+</div>
+<div class="modal" id="planning"><div class="panel">
+<h2>Prefeitura</h2>
+<nav class="btns"><button data-page="finance">Finanças</button><button data-page="mobility">Mobilidade</button><button data-page="goals">Objetivos</button></nav>
+<section id="finance">
+<label>Impostos <output id="taxValue"></output><input id="tax" type="range" min="50" max="150" step="5"></label>
+<label>Orçamento de serviços <output id="budgetValue"></output><input id="budget" type="range" min="50" max="150" step="5"></label>
+<label><input type="checkbox" id="imports"> Importar alimento em falta · R$ 2/un.</label>
+<div id="ledger"></div></section>
+<section id="mobility" hidden><label><input type="checkbox" id="heat"> Mostrar fluxo nas vias</label><p>Verde indica folga, amarelo indica uso acima de 55% e vermelho indica sobrecarga. Toque numa via no modo Ver para consultar a viagem principal.</p>
+<div class="btns"><button id="newBus">Linha de ônibus</button><button id="newMetro">Linha de metrô</button></div><div id="lines"></div></section>
+<section id="goals" hidden><label>Vocação econômica <select id="focus"><option value="equilibrio">Diversificada</option><option value="industria">Exportadora</option><option value="turismo">Turística</option></select></label><p id="focusHint"></p><div id="missions"></div></section>
+<div class="btns"><button class="big" id="planClose">Voltar à cidade</button></div></div></div>
 
 <div class="modal" id="menu"><div class="panel">
   <h2><svg class="ico"><use href="#i-city"/></svg>Cidade</h2>
   <p>Protótipo. O jogo salva sozinho neste navegador.</p>
   <div class="btns">
     <button class="big" id="mClose">Continuar</button>
-    <button id="mHelp">Como jogar</button>
+    <button id="planOpen">Gestão da cidade</button><button id="mHelp">Como jogar</button>
     <button id="oSfx">Sons</button>
     <button id="oMus">Música</button>
     <button id="oQ">Gráficos</button>
     <button id="oCopy">Copiar cidade</button>
     <button id="oPaste">Colar cidade</button>
-    <button class="danger" id="mNew">Novo jogo</button>
+    <button id="restore4" hidden>Recuperar cidade da entrega B</button><button id="restore5" hidden>Recuperar cidade da entrega C</button><button class="danger" id="mNew">Novo jogo</button>
   </div>
 </div></div>
 
@@ -281,9 +345,9 @@ body.tray-open #alert{display:none!important}
   <h2><svg class="ico"><use href="#i-city"/></svg>Como jogar</h2>
   <ul>
     <li><svg class="ico"><use href="#i-hand"/></svg><span><b>Câmera:</b> arraste com um dedo no modo Ver, ou com dois dedos em qualquer modo. Pinça para zoom. No PC: WASD, roda do mouse e Q/E para girar.</span></li>
-    <li><svg class="ico"><use href="#i-road"/></svg><span><b>Ruas:</b> arraste para desenhar. Sobre o rio vira ponte. Avenidas aguentam mais trânsito; viadutos passam por cima de ruas, trilhos e rio.</span></li>
+    <li><svg class="ico"><use href="#i-road"/></svg><span><b>Ruas:</b> escolha o traçado e arraste. Toque no início e no fim para continuar a partir da última ponta. Na curva de três pontos, marque também a direção. Curva contínua mantém a tangente. Em Quadras, marque origem, largura e profundidade. Novo início encerra a sequência. Na rotatória, arraste do centro até a borda. Sobre o rio vira ponte. Avenidas aguentam mais trânsito; viadutos passam por cima de ruas, trilhos e rio.</span></li>
     <li><svg class="ico"><use href="#i-power"/></svg><span><b>Serviços:</b> prédios precisam de energia e água (tudo ligado pela rua). Escola, saúde, polícia e bombeiros sobem o nível dos prédios.</span></li>
-    <li><svg class="ico"><use href="#i-train"/></svg><span><b>Transporte:</b> garagem + pontos de ônibus, estações de metrô (ligam sozinhas) e trilhos com duas estações de trem tiram carros da rua.</span></li>
+    <li><svg class="ico"><use href="#i-train"/></svg><span><b>Transporte:</b> garagem + pontos de ônibus, estações de metrô com uma linha definida em Gestão da cidade e trilhos com duas estações de trem tiram carros da rua.</span></li>
     <li><svg class="ico"><use href="#i-district"/></svg><span><b>Distritos:</b> pinte uma área, dê um nome e escolha regras para ela.</span></li>
     <li><svg class="ico"><use href="#i-res"/></svg><span><b>Bairros:</b> pinte zonas <b style="color:#3f8f33">residenciais</b>, <b style="color:#2f6fc0">comerciais</b>, <b style="color:#b98a1e">industriais</b> e <b style="color:#7350c0">escritórios</b> ao lado das ruas. Os prédios surgem sozinhos quando há demanda (barras R C I), em tamanhos de 1×1 até 4×4 conforme o espaço e o valor do terreno.</span></li>
     <li><svg class="ico"><use href="#i-city"/></svg><span><b>Etapas:</b> Vila, Cidade pequena (1.000), Cidade (5.000) e Metrópole (20.000). Cada etapa libera prédios maiores; a alta densidade chega na Cidade pequena.</span></li>
@@ -300,13 +364,13 @@ body.tray-open #alert{display:none!important}
 
 <div class="modal" id="confirmNew"><div class="panel">
   <h2>Começar de novo?</h2>
-  <p>A cidade atual será apagada.</p>
+  <p>A cidade atual será apagada.</p><label>Mapa <select id="mapChoice"><option value="rio">Planície do rio</option><option value="vale">Vale sinuoso</option><option value="ilhas">Arquipélago</option></select></label>
   <div class="btns">
     <button class="danger" id="cYes">Sim, novo jogo</button>
     <button id="cNo">Cancelar</button>
   </div>
 </div></div>
 
-<script type="module" src="./game.js"></script>
+<script type="module" src="./game.js"></script><script>if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(console.warn);</script>
 </body>
 </html>

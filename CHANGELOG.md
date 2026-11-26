@@ -1,5 +1,13 @@
 # Histórico de mudanças
 
+## Planejamento e vias — 2026-11-25
+
+- Ruas e avenidas com retas, curvas paramétricas e curvas de três pontos. Rotatórias, mão única, rampas, dois níveis elevados e túneis.
+- Rotas de passageiros e carga, fluxo por trecho e linhas configuráveis de ônibus e metrô.
+- Impostos e orçamento ajustáveis, importação de alimento, cadeia de madeira, vocações e desafios por etapa.
+- Três mapas, ciclo de iluminação e abertura offline após o primeiro acesso.
+- Save v6 com migração de v4 e v5, seleção de cidades antigas e validação antes de importar.
+
 ## Entrega C — 2026-11-24
 - Energia (eólica, carvão, solar, nuclear) e água (caixa, bomba no rio, tratamento) distribuídas pela rede de ruas.
 - Escola, universidade, posto, hospital, polícia e bombeiros; prédios sobem de nível (1 a 3 estrelas).
